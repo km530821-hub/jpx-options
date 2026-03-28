@@ -1,0 +1,51 @@
+name: JPX Options Data Fetch
+
+on:
+  schedule:
+    # 毎営業日 17:30 JST (= 08:30 UTC) に実行
+    - cron: '30 8 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      date:
+        description: '取得日付 (YYYYMMDD) ※空欄で最新営業日'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  fetch-options-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install requests pandas numpy scipy
+
+      - name: Fetch JPX Options Data
+        env:
+          TARGET_DATE: ${{ github.event.inputs.date }}
+        run: |
+          python scripts/fetch_jpx.py
+
+      - name: Compute Greeks & Analysis
+        run: |
+          python scripts/compute_analysis.py
+
+      - name: Commit and push data
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/
+          git diff --staged --quiet || git commit -m "chore: update JPX options data $(date '+%Y-%m-%d')"
+          git push
