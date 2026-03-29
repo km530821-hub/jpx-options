@@ -110,10 +110,14 @@ def main():
     exp = expiry_date(cmonth_dt)
     T = max((exp - date.today()).days, 1) / 252.0
 
-    # ATM IV（新形式ではIVがパーセント単位かどうか確認）
-    iv_raw = df_near[df_near["StrikePrice"] == atm_strike]["IV"].dropna()
-    atm_iv = float(iv_raw.iloc[0]) if not iv_raw.empty else 0.25
-    # IVが1未満 → すでに小数、1以上 → パーセント表記
+    # ATM IV: 0.01は無効値なので除外し、先物に最も近い有効なIVを使用
+    iv_valid = df_near[(df_near["IV"].notna()) & (df_near["IV"] > 0.05)].copy()
+    iv_valid["dist"] = (iv_valid["StrikePrice"] - S).abs()
+    if not iv_valid.empty:
+        atm_iv = float(iv_valid.sort_values("dist").iloc[0]["IV"])
+    else:
+        atm_iv = 0.35
+    # IVは小数表記（0.376 = 37.6%）
     atm_iv_dec = atm_iv if atm_iv < 1 else atm_iv / 100
 
     log.info("ATM行使価格: %.0f  IV(raw): %.4f  T: %.4f年", atm_strike, atm_iv, T)
@@ -131,7 +135,7 @@ def main():
     for _, row in df_near.iterrows():
         K = row["StrikePrice"]
         iv = row["IV"]
-        if pd.isna(K) or pd.isna(iv) or iv <= 0:
+        if pd.isna(K) or pd.isna(iv) or iv <= 0.05:
             continue
         iv_dec = iv if iv < 1 else iv / 100
         oi = float(row.get("OI_proxy", 1))
