@@ -49,10 +49,11 @@ def bs_greeks(S, K, T, sigma, opt_type, r=0.005):
 
 def expiry_date(contract_month_dt):
     """限月の第2金曜日を返す"""
+    from calendar import monthrange
     y, m = int(contract_month_dt.year), int(contract_month_dt.month)
-    first = date(y, m, 1)
-    fridays = [first.replace(day=d) for d in range(1, 32)
-               if first.replace(day=d).month == m and first.replace(day=d).weekday() == 4]
+    days_in_month = monthrange(y, m)[1]
+    fridays = [date(y, m, d) for d in range(1, days_in_month + 1)
+               if date(y, m, d).weekday() == 4]
     return fridays[1] if len(fridays) >= 2 else fridays[0]
 
 
