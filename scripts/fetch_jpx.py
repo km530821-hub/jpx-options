@@ -1,8 +1,9 @@
 """
 fetch_jpx.py
-2026年2月24日よりURL・形式変更:
-  新URL: https://www.jpx.co.jp/automation/markets/derivatives/option-price/files/ose{YYYYMMDD}tp.csv
-  形式:  ZIP圧縮 → CSV直接配信
+新URL・新列構造（2026年2月24日以降）対応版
+列: UnderlyingName, OptionType, ContractMonth, StrikePrice,
+    ?, SecurityCode, CallBid, CallAsk, CallClose, TheoreticalPrice,
+    PutSecurityCode, PutBid, PutAsk, UnderlyingClose, IV, BaseVolatility, Delta
 """
 
 import os
@@ -20,9 +21,23 @@ log = logging.getLogger(__name__)
 BASE_URL = "https://www.jpx.co.jp/automation/markets/derivatives/option-price/files/ose{date}tp.csv"
 
 COLUMNS = [
-    "OptionType", "UnderlyingName", "ContractMonth", "StrikePrice",
-    "SecurityCode", "PremiumClose", "TheoreticalPrice", "IV",
-    "UnderlyingClose", "BaseVolatility",
+    "UnderlyingName",    # NK225E など
+    "OptionType",        # OOP など
+    "ContractMonth",     # 202604
+    "StrikePrice",       # 10000
+    "Col5",
+    "CallSecurityCode",  # 131400018
+    "CallBid",
+    "CallAsk",
+    "CallClose",         # コール終値
+    "TheoreticalPrice",  # 理論価格
+    "PutSecurityCode",
+    "PutBid",
+    "PutAsk",
+    "UnderlyingClose",   # 43031.01 → 原資産終値
+    "IV",                # 0.01 など
+    "BaseVolatility",    # 53373.07
+    "Delta",             # 0.4007
 ]
 
 DATA_DIR = Path("data")
@@ -65,11 +80,15 @@ def fetch_csv(target_date: str):
     return None
 
 
-def clean(df):
-    for col in ["StrikePrice", "PremiumClose", "TheoreticalPrice", "IV", "UnderlyingClose", "BaseVolatility"]:
+def clean(df: pd.DataFrame) -> pd.DataFrame:
+    for col in ["StrikePrice", "CallClose", "TheoreticalPrice",
+                "IV", "UnderlyingClose", "BaseVolatility", "Delta"]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
-    df = df[df["UnderlyingName"].str.contains("日経", na=False)].copy()
+
+    # 日経225オプションのみ（NK225E など）
+    df = df[df["UnderlyingName"].str.contains("NK225|日経", na=False)].copy()
     df["ContractMonthDt"] = pd.to_datetime(df["ContractMonth"], format="%Y%m", errors="coerce")
+
     log.info("日経225オプション: %d 行", len(df))
     return df.reset_index(drop=True)
 
@@ -82,7 +101,7 @@ def main():
     used_date = None
     for d in candidates:
         df = fetch_csv(d)
-        if df is not None:
+        if df is not None and len(df) > 0:
             used_date = d
             break
 
@@ -93,12 +112,13 @@ def main():
     df = clean(df)
     df.to_csv(DATA_DIR / f"options_{used_date}.csv", index=False, encoding="utf-8-sig")
     df.to_csv(DATA_DIR / "options_latest.csv", index=False, encoding="utf-8-sig")
-    log.info("保存完了: options_%s.csv", used_date)
+    log.info("保存完了: options_%s.csv (%d行)", used_date, len(df))
 
+    underlying = df["UnderlyingClose"].dropna()
     meta = {
         "date": used_date,
         "rows": len(df),
-        "underlying_close": float(df["UnderlyingClose"].dropna().iloc[0]) if not df["UnderlyingClose"].dropna().empty else None,
+        "underlying_close": float(underlying.iloc[0]) if not underlying.empty else None,
     }
     (DATA_DIR / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2))
     log.info("メタ: %s", meta)
