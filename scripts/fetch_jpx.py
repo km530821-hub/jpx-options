@@ -87,6 +87,7 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
 
     # 日経225オプションのみ（NK225E など）
     df = df[df["UnderlyingName"].str.contains("NK225|日経", na=False)].copy()
+    df["ContractMonth"] = df["ContractMonth"].str.strip()
     df["ContractMonthDt"] = pd.to_datetime(df["ContractMonth"], format="%Y%m", errors="coerce")
 
     log.info("日経225オプション: %d 行", len(df))

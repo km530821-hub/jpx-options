@@ -77,6 +77,7 @@ def main():
         raise SystemExit(1)
 
     df = pd.read_csv(csv_path, dtype={"ContractMonth": str})
+    df["ContractMonth"] = df["ContractMonth"].str.strip()
     df["ContractMonthDt"] = pd.to_datetime(df["ContractMonth"], format="%Y%m", errors="coerce")
 
     # 原資産価格
