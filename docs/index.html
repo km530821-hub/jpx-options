@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NK225 オプション解析</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root{
+  --bg:#0a0e1a;--bg2:#111827;--bg3:#1a2235;--bg4:#1f2d44;
+  --border:#2a3a55;--border2:#3a4f70;
+  --text:#e8edf5;--text2:#8fa3c0;--text3:#5a7090;
+  --blue:#3b82f6;--blue2:#1d4ed8;--blue-dim:#1e3a5f;
+  --green:#22c55e;--green-dim:#14532d;
+  --red:#ef4444;--red-dim:#7f1d1d;
+  --amber:#f59e0b;--amber-dim:#78350f;
+  --purple:#a78bfa;--purple-dim:#3b1f6e;
+  --teal:#2dd4bf;--teal-dim:#134e4a;
+  --pink:#f472b6;--pink-dim:#831843;
+  --r:8px;--r2:12px;
+  --font:'DM Mono',monospace;
+  --font2:'DM Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font2);font-size:13px;min-height:100vh}
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap');
+
+.layout{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:200px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 0}
+.logo{padding:0 16px 16px;border-bottom:1px solid var(--border);margin-bottom:12px}
+.logo-title{font-size:14px;font-weight:600;color:var(--text);letter-spacing:-.3px}
+.logo-sub{font-size:10px;color:var(--text3);margin-top:2px;font-family:var(--font)}
+.nav-item{display:flex;align-items:center;gap:8px;padding:8px 16px;cursor:pointer;color:var(--text2);font-size:12px;font-weight:500;transition:all .15s;border-left:2px solid transparent}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-item.active{background:var(--blue-dim);color:var(--blue);border-left-color:var(--blue)}
+.nav-icon{width:16px;height:16px;flex-shrink:0;opacity:.7}
+.nav-item.active .nav-icon{opacity:1}
+.sidebar-footer{margin-top:auto;padding:12px 16px;border-top:1px solid var(--border)}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;margin-right:6px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.status-text{font-size:10px;color:var(--text3);font-family:var(--font)}
+
+.main{flex:1;overflow-y:auto;background:var(--bg)}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--bg2);position:sticky;top:0;z-index:100}
+.page-title{font-size:14px;font-weight:600;color:var(--text)}
+.topbar-right{display:flex;align-items:center;gap:8px}
+.badge{font-size:10px;padding:3px 8px;border-radius:4px;font-family:var(--font);border:1px solid}
+.badge-blue{background:var(--blue-dim);color:var(--blue);border-color:var(--blue2)}
+.badge-green{background:var(--green-dim);color:var(--green);border-color:#166534}
+.badge-amber{background:var(--amber-dim);color:var(--amber);border-color:#92400e}
+.badge-red{background:var(--red-dim);color:var(--red);border-color:#991b1b}
+.load-btn{padding:5px 12px;font-size:11px;font-weight:500;background:var(--blue);color:#fff;border:none;border-radius:var(--r);cursor:pointer;font-family:var(--font2);transition:background .15s}
+.load-btn:hover{background:var(--blue2)}
+
+.content{padding:16px 20px}
+.sec{display:none}.sec.active{display:block}
+
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px}
+@media(max-width:900px){.grid4{grid-template-columns:repeat(2,1fr)}.grid3{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.layout{flex-direction:column}.sidebar{width:100%;height:auto;flex-direction:row;overflow-x:auto;padding:8px}.grid4,.grid3,.grid2{grid-template-columns:1fr 1fr}}
+
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:12px 14px}
+.kpi-label{font-size:10px;color:var(--text3);margin-bottom:4px;font-family:var(--font);text-transform:uppercase;letter-spacing:.5px}
+.kpi-value{font-size:22px;font-weight:600;color:var(--text);font-family:var(--font);letter-spacing:-1px}
+.kpi-sub{font-size:10px;color:var(--text3);margin-top:3px}
+.kpi-up{color:var(--green)}.kpi-dn{color:var(--red)}.kpi-bl{color:var(--blue)}.kpi-am{color:var(--amber)}
+
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px;margin-bottom:14px}
+.card-title{font-size:11px;font-weight:600;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;font-family:var(--font)}
+.chart-wrap{position:relative;width:100%}
+
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{text-align:right;padding:6px 8px;color:var(--text3);border-bottom:1px solid var(--border);font-weight:500;font-family:var(--font);font-size:10px;text-transform:uppercase;letter-spacing:.3px}
+th:first-child{text-align:left}
+td{text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);color:var(--text);font-family:var(--font);font-size:11px}
+td:first-child{text-align:left;color:var(--text2)}
+tr:last-child td{border-bottom:none}
+tr.hl td{background:rgba(59,130,246,.08);color:var(--blue)}
+tr:hover td{background:var(--bg3)}
+
+.ri{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)}
+.ri:last-child{border-bottom:none}
+.rl{font-size:11px;color:var(--text3)}
+.rv{font-size:12px;font-weight:500;color:var(--text);font-family:var(--font)}
+
+.map-row{display:flex;align-items:center;gap:0;margin-bottom:2px;border-radius:6px;overflow:hidden;transition:background .1s}
+.map-row:hover{background:rgba(255,255,255,.03)}
+.map-price{width:80px;flex-shrink:0;font-size:11px;font-weight:500;font-family:var(--font);text-align:right;padding-right:10px;color:var(--text2)}
+.map-bar{flex:1;display:flex;align-items:center;gap:8px;padding:7px 12px;border-left:2px solid}
+.map-tag{font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;white-space:nowrap;flex-shrink:0;font-family:var(--font);text-transform:uppercase;letter-spacing:.3px}
+.map-desc{font-size:11px;color:var(--text2);flex:1;line-height:1.3}
+.map-price.current{color:var(--blue);font-weight:700}
+.map-bar.current{border-left-color:var(--blue);background:rgba(59,130,246,.08)}
+
+.input-section{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:14px}
+@media(max-width:700px){.input-section{grid-template-columns:1fr}}
+.input-group label{font-size:10px;color:var(--text3);display:block;margin-bottom:4px;font-family:var(--font);text-transform:uppercase;letter-spacing:.3px}
+.input-group input,.input-group textarea{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:7px 10px;font-size:12px;color:var(--text);font-family:var(--font);outline:none;transition:border-color .15s}
+.input-group input:focus,.input-group textarea:focus{border-color:var(--blue2)}
+.input-group{margin-bottom:10px}
+.apply-btn{width:100%;padding:10px;font-size:12px;font-weight:600;background:var(--blue);color:#fff;border:none;border-radius:var(--r);cursor:pointer;font-family:var(--font2);transition:background .15s;letter-spacing:.2px}
+.apply-btn:hover{background:var(--blue2)}
+
+.subtabs{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap}
+.stab{padding:5px 12px;font-size:11px;font-weight:500;background:var(--bg3);border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--text2);font-family:var(--font2);transition:all .15s}
+.stab.active{background:var(--blue-dim);color:var(--blue);border-color:var(--blue2)}
+.ssec{display:none}.ssec.active{display:block}
+
+.irow{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.irow label{font-size:10px;color:var(--text3);width:140px;flex-shrink:0;font-family:var(--font)}
+.irow input[type=range]{flex:1;accent-color:var(--blue)}
+.irow .iv{font-size:12px;font-weight:500;min-width:80px;text-align:right;color:var(--text);font-family:var(--font)}
+.irow input[type=number],.irow input[type=text],.irow input[type=date]{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:11px;color:var(--text);font-family:var(--font);outline:none}
+.seg{display:flex;gap:4px;margin-bottom:12px}
+.seg button{padding:5px 14px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--text2);font-family:var(--font2)}
+.seg button.active{background:var(--blue-dim);color:var(--blue);border-color:var(--blue2)}
+.info{background:var(--bg3);border-radius:var(--r);padding:10px 12px;font-size:11px;color:var(--text3);margin-bottom:14px;line-height:1.6;border-left:2px solid var(--border2)}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<div class="sidebar">
+  <div class="logo">
+    <div class="logo-title">NK225 Analytics</div>
+    <div class="logo-sub">オプション総合解析</div>
+  </div>
+  <div class="nav-item active" onclick="showSec('dashboard',this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+    市場統計
+  </div>
+  <div class="nav-item" onclick="showSec('techmap',this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M1 12l4-4 3 3 4-5 3 2V14H1z"/></svg>
+    テクニカルマップ
+  </div>
+  <div class="nav-item" onclick="showSec('gex',this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="8" width="2" height="7"/><rect x="4" y="5" width="2" height="10"/><rect x="7" y="3" width="2" height="12"/><rect x="10" y="6" width="2" height="9"/><rect x="13" y="4" width="2" height="11"/></svg>
+    GEX分析
+  </div>
+  <div class="nav-item" onclick="showSec('iv',this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M1 13 C3 13 4 4 8 4 C12 4 13 13 15 13" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+    IV・スマイル
+  </div>
+  <div class="nav-item" onclick="showSec('bs',this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+    BS計算
+  </div>
+  <div class="nav-item" onclick="showSec('load',this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1v8M5 6l3 3 3-3M2 11v2a1 1 0 001 1h10a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+    データ読込
+  </div>
+  <div class="sidebar-footer">
+    <span class="status-dot"></span>
+    <span class="status-text" id="footer-date">-</span>
+  </div>
+</div>
+
+<div class="main">
+<div class="topbar">
+  <div class="page-title" id="page-title">市場統計ダッシュボード</div>
+  <div class="topbar-right">
+    <span class="badge badge-green" id="top-dte">-</span>
+    <span class="badge badge-blue" id="top-date">読込待ち</span>
+    <button class="load-btn" onclick="showSec('load',null)">データ更新</button>
+  </div>
+</div>
+
+<div class="content">
+
+<!-- 市場統計 -->
+<div class="sec active" id="sec-dashboard">
+  <div class="grid4">
+    <div class="kpi"><div class="kpi-label">原資産（先物）</div><div class="kpi-value kpi-bl" id="d-s">-</div><div class="kpi-sub" id="d-month">-</div></div>
+    <div class="kpi"><div class="kpi-label">MaxPain</div><div class="kpi-value kpi-am" id="d-mp">-</div><div class="kpi-sub" id="d-mpdiff">-</div></div>
+    <div class="kpi"><div class="kpi-label">GammaFlip</div><div class="kpi-value kpi-bl" id="d-gf">-</div><div class="kpi-sub" id="d-gfzone">-</div></div>
+    <div class="kpi"><div class="kpi-label">ATM IV</div><div class="kpi-value" id="d-iv">-</div><div class="kpi-sub">インプライドボラ</div></div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">ATM コール グリークス</div>
+      <div id="call-g"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">ATM プット グリークス</div>
+      <div id="put-g"></div>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">GEXサマリー</div>
+      <div id="gex-sum"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Implied Move（04限月）</div>
+      <div id="im-sum"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">価格マップ</div>
+    <div id="pricemap"></div>
+  </div>
+</div>
+
+<!-- テクニカルマップ -->
+<div class="sec" id="sec-techmap">
+  <div class="subtabs">
+    <button class="stab active" onclick="showSub('tm-map',this,'tm')">マップ表示</button>
+    <button class="stab" onclick="showSub('tm-input',this,'tm')">テクニカル入力</button>
+  </div>
+  <div class="ssec active" id="ssec-tm-map">
+    <div class="grid3">
+      <div class="kpi"><div class="kpi-label">現在値</div><div class="kpi-value kpi-bl" id="tm-now">-</div><div class="kpi-sub">先物</div></div>
+      <div class="kpi"><div class="kpi-label">MaxPain</div><div class="kpi-value kpi-am" id="tm-mp">-</div><div class="kpi-sub" id="tm-mpdiff">-</div></div>
+      <div class="kpi"><div class="kpi-label">GammaFlip</div><div class="kpi-value" id="tm-gf">-</div><div class="kpi-sub">安定化転換</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">価格レベルマップ（高 → 低）</div>
+      <div id="tech-map-body"></div>
+    </div>
+    <div class="info">
+      凡例：
+      <span style="color:#22c55e">Call壁</span> コールウォール上値抵抗　
+      <span style="color:#ef4444">Put壁</span> プットウォール下値支持　
+      <span style="color:#f59e0b">MaxPain</span> SQ引力中心　
+      <span style="color:#a78bfa">GammaFlip</span> GEX正負転換　
+      <span style="color:#94a3b8">MA</span> 移動平均・転換線　
+      <span style="color:#3b82f6">VWAP</span> 出来高加重平均　
+      <span style="color:#f472b6">BB</span> ボリンジャーバンド　
+      <span style="color:#2dd4bf">IM</span> Implied Move
+    </div>
+  </div>
+  <div class="ssec" id="ssec-tm-input">
+    <div class="input-section">
+      <div class="card">
+        <div class="card-title">オプション由来（自動反映）</div>
+        <div class="input-group"><label>現在値（先物）</label><input type="number" id="tm-i-now" value="51250"></div>
+        <div class="input-group"><label>MaxPain</label><input type="number" id="tm-i-mp" value="54125"></div>
+        <div class="input-group"><label>GammaFlip</label><input type="number" id="tm-i-gf" value="53592"></div>
+        <div class="input-group"><label>Call Wall（Global）</label><input type="number" id="tm-i-cw" value="60000"></div>
+        <div class="input-group"><label>Put Wall（Global）</label><input type="number" id="tm-i-pw" value="50000"></div>
+        <div class="input-group"><label>Implied Move 上限</label><input type="number" id="tm-i-imu" value="55000"></div>
+        <div class="input-group"><label>Implied Move 下限</label><input type="number" id="tm-i-iml" value="47712"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">テクニカル指標（手動入力）</div>
+        <div class="input-group"><label>週足 MA5</label><input type="number" id="tm-i-wma5" value="53244"></div>
+        <div class="input-group"><label>週足 MA20</label><input type="number" id="tm-i-wma20" value="52892"></div>
+        <div class="input-group"><label>日足転換線</label><input type="number" id="tm-i-dten" value="52765"></div>
+        <div class="input-group"><label>週足基準線</label><input type="number" id="tm-i-wbase" value="52440"></div>
+        <div class="input-group"><label>月足転換線</label><input type="number" id="tm-i-mten" value="49415"></div>
+        <div class="input-group"><label>VWAP（60分）</label><input type="number" id="tm-i-vwap" value="51895"></div>
+        <div class="input-group"><label>BB -2σ</label><input type="number" id="tm-i-bb2" value="50895"></div>
+        <div class="input-group"><label>BB -3σ（下限帯）</label><input type="number" id="tm-i-bb3" value="47500"></div>
+      </div>
+    </div>
+    <button class="apply-btn" onclick="applyTechMap()">マップを更新する</button>
+  </div>
+</div>
+
+<!-- GEX -->
+<div class="sec" id="sec-gex">
+  <div class="grid3" id="gex-cards"></div>
+  <div class="card">
+    <div class="card-title">行使価格別 GEX</div>
+    <div class="chart-wrap" style="height:260px"><canvas id="gexChart"></canvas></div>
+  </div>
+  <div class="info">GEX+（正）→ ディーラーがロングガンマ、価格変動を抑制する安定化ゾーン。GEX-（負）→ ショートガンマ、トレンドが加速しやすい不安定化ゾーン。GEXが最大の行使価格がCall Wall（上値抵抗）として機能しやすい。</div>
+</div>
+
+<!-- IV -->
+<div class="sec" id="sec-iv">
+  <div class="subtabs">
+    <button class="stab active" onclick="showSub('iv-smile',this,'iv')">IVスマイル</button>
+    <button class="stab" onclick="showSub('iv-table',this,'iv')">行使価格別IV</button>
+    <button class="stab" onclick="showSub('iv-calc',this,'iv')">IV逆算</button>
+  </div>
+  <div class="ssec active" id="ssec-iv-smile">
+    <div class="card">
+      <div class="card-title">ボラティリティ・スマイル（ATM付近）</div>
+      <div class="chart-wrap" style="height:260px"><canvas id="smileChart"></canvas></div>
+    </div>
+  </div>
+  <div class="ssec" id="ssec-iv-table">
+    <div class="card">
+      <div class="card-title">行使価格別 IV・Delta・終値</div>
+      <div style="overflow-x:auto;max-height:360px;overflow-y:auto">
+        <table id="iv-tbl">
+          <thead><tr><th style="text-align:left">行使価格</th><th>IV (%)</th><th>Delta</th><th>コール終値</th><th>理論価格</th></tr></thead>
+          <tbody id="iv-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="ssec" id="ssec-iv-calc">
+    <div class="card">
+      <div class="card-title">市場価格からIV逆算</div>
+      <div class="irow"><label>市場オプション価格</label><input type="range" id="ivc-mkt" min="10" max="3000" step="10" value="500" oninput="calcIVInv()"><span class="iv" id="ivc-mktv">500円</span></div>
+      <div class="irow"><label>原資産価格</label><input type="range" id="ivc-s" min="30000" max="70000" step="50" value="51250" oninput="calcIVInv()"><span class="iv" id="ivc-sv">51,250円</span></div>
+      <div class="irow"><label>行使価格</label><input type="range" id="ivc-k" min="30000" max="70000" step="250" value="51250" oninput="calcIVInv()"><span class="iv" id="ivc-kv">51,250円</span></div>
+      <div class="irow"><label>残存日数</label><input type="range" id="ivc-t" min="1" max="120" step="1" value="12" oninput="calcIVInv()"><span class="iv" id="ivc-tv">12日</span></div>
+      <div class="grid2" style="margin-top:12px">
+        <div class="kpi"><div class="kpi-label">計算IV</div><div class="kpi-value kpi-bl" id="ivc-result">-</div></div>
+        <div class="kpi"><div class="kpi-label">IVレベル</div><div class="kpi-value" style="font-size:14px;padding-top:4px" id="ivc-level">-</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BS計算 -->
+<div class="sec" id="sec-bs">
+  <div class="seg">
+    <button class="active" onclick="setOT('C',this)">コール (C)</button>
+    <button onclick="setOT('P',this)">プット (P)</button>
+  </div>
+  <div class="card">
+    <div class="card-title">パラメータ</div>
+    <div class="irow"><label>原資産価格 (S)</label><input type="range" id="bs-s" min="30000" max="70000" step="50" value="51250" oninput="calcBS()"><span class="iv" id="bs-sv">51,250</span></div>
+    <div class="irow"><label>行使価格 (K)</label><input type="range" id="bs-k" min="30000" max="70000" step="250" value="51250" oninput="calcBS()"><span class="iv" id="bs-kv">51,250</span></div>
+    <div class="irow"><label>残存日数</label><input type="range" id="bs-t" min="1" max="120" step="1" value="12" oninput="calcBS()"><span class="iv" id="bs-tv">12日</span></div>
+    <div class="irow"><label>IV (σ) %</label><input type="range" id="bs-sig" min="5" max="100" step="0.5" value="38" oninput="calcBS()"><span class="iv" id="bs-sigv">38.0%</span></div>
+    <div class="irow"><label>金利 (r) %</label><input type="range" id="bs-r" min="0" max="2" step="0.05" value="0.5" oninput="calcBS()"><span class="iv" id="bs-rv">0.50%</span></div>
+  </div>
+  <div class="grid3">
+    <div class="kpi"><div class="kpi-label">オプション価格</div><div class="kpi-value kpi-bl" id="bs-price">-</div></div>
+    <div class="kpi"><div class="kpi-label">本質的価値</div><div class="kpi-value" id="bs-intr">-</div></div>
+    <div class="kpi"><div class="kpi-label">時間的価値</div><div class="kpi-value" id="bs-time">-</div></div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">グリークス</div>
+      <div id="bs-greeks"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">損益グラフ</div>
+      <div class="seg" style="margin-bottom:8px">
+        <button class="active" onclick="setPT('C',this)">買</button>
+        <button onclick="setPT('S',this)">売</button>
+      </div>
+      <div class="chart-wrap" style="height:200px"><canvas id="plChart"></canvas></div>
+      <div style="margin-top:8px">
+        <div class="ri"><span class="rl">損益分岐点</span><span class="rv" id="pl-be">-</span></div>
+        <div class="ri"><span class="rl">最大損失</span><span class="rv" id="pl-min">-</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- データ読込 -->
+<div class="sec" id="sec-load">
+  <div class="card">
+    <div class="card-title">GitHub から自動読込</div>
+    <div class="input-group"><label>GitHubユーザー名</label><input type="text" id="gh-user" value="km530821-hub"></div>
+    <div class="input-group"><label>リポジトリ名</label><input type="text" id="gh-repo" value="jpx-options"></div>
+    <button class="apply-btn" onclick="loadGitHub()" style="margin-top:4px">GitHubから最新データを読込</button>
+    <div id="load-msg" style="margin-top:10px;font-size:11px;font-family:var(--font);color:var(--text3)"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">JSONを直接貼り付け</div>
+    <div class="input-group"><textarea id="json-paste" rows="6" style="font-family:var(--font);font-size:10px" placeholder='{"generated_at":"...","underlying":{"close":51250},...}'></textarea></div>
+    <button class="apply-btn" onclick="loadPaste()">貼り付けJSONを読込</button>
+  </div>
+</div>
+
+</div>
+</div>
+</div>
+
+<script>
+let D=null, otType='C', plType='C';
+let gexChart=null, smileChart=null, plChart=null;
+
+const pageTitles={'dashboard':'市場統計ダッシュボード','techmap':'テクニカルマップ','gex':'GEX分析','iv':'IV・スマイル分析','bs':'BS計算・損益グラフ','load':'データ読込'};
+
+function showSec(id,el){
+  document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  if(el)el.classList.add('active');
+  else document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+id+"'"))n.classList.add('active');});
+  document.getElementById('page-title').textContent=pageTitles[id]||id;
+  if(D){if(id==='gex')renderGEX();if(id==='iv')renderIV();if(id==='bs')calcBS();}
+  if(id==='techmap')renderTechMap();
+}
+function showSub(id,el,group){
+  const parent=el.closest('.sec')||document;
+  parent.querySelectorAll('.ssec').forEach(s=>s.classList.remove('active'));
+  el.parentElement.querySelectorAll('.stab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('ssec-'+id).classList.add('active');
+  el.classList.add('active');
+}
+
+function N(x){return 0.5*(1+erf(x/Math.sqrt(2)));}
+function erf(x){const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;const s=x<0?-1:1;x=Math.abs(x);const t=1/(1+p*x);return s*(1-((((a5*t+a4)*t+a3)*t+a2)*t+a1)*t*Math.exp(-x*x));}
+function Npdf(x){return Math.exp(-x*x/2)/Math.sqrt(2*Math.PI);}
+function bs(S,K,T,sig,r,type){
+  const sq=Math.sqrt(T),d1=(Math.log(S/K)+(r+sig*sig/2)*T)/(sig*sq),d2=d1-sig*sq;
+  const g=Npdf(d1)/(S*sig*sq),v=S*Npdf(d1)*sq;
+  if(type==='C')return{price:S*N(d1)-K*Math.exp(-r*T)*N(d2),delta:N(d1),gamma:g,theta:(-S*Npdf(d1)*sig/(2*sq)-r*K*Math.exp(-r*T)*N(d2))/252,vega:v,rho:K*T*Math.exp(-r*T)*N(d2)/100,d1,d2};
+  return{price:K*Math.exp(-r*T)*N(-d2)-S*N(-d1),delta:N(d1)-1,gamma:g,theta:(-S*Npdf(d1)*sig/(2*sq)+r*K*Math.exp(-r*T)*N(-d2))/252,vega:v,rho:-K*T*Math.exp(-r*T)*N(-d2)/100,d1,d2};
+}
+function fmt(v,d=0){if(v==null||isNaN(v))return'-';return Number(v).toLocaleString('ja-JP',{minimumFractionDigits:d,maximumFractionDigits:d});}
+function fmtS(v,d=0){if(v==null||isNaN(v))return'-';return(v>=0?'+':'')+fmt(v,d);}
+function pct(v,d=1){if(v==null||isNaN(v))return'-';return Number(v).toFixed(d)+'%';}
+function c(v){return v>=0?'kpi-up':'kpi-dn';}
+
+function renderDashboard(){
+  if(!D)return;
+  const S=D.underlying.close,mp=D.max_pain,gf=D.gamma_flip,iv=D.atm_iv_pct,dte=D.dte;
+  const cg=D.atm_call_greeks||{},pg=D.atm_put_greeks||{};
+  document.getElementById('d-s').textContent=fmt(S);
+  document.getElementById('d-month').textContent=D.nearest_month.slice(0,4)+'年'+D.nearest_month.slice(4)+'月限';
+  document.getElementById('d-mp').textContent=fmt(mp);
+  document.getElementById('d-mpdiff').textContent='先物差 '+fmtS(mp-S);
+  document.getElementById('d-gf').textContent=gf?fmt(gf):'なし';
+  const isAboveGF=gf&&S>gf;
+  document.getElementById('d-gfzone').textContent=gf?(isAboveGF?'GEX+ 安定化':'GEX- 不安定化'):'-';
+  document.getElementById('d-iv').textContent=pct(iv);
+  document.getElementById('top-date').textContent=D.generated_at;
+  document.getElementById('top-dte').textContent='DTE: '+dte+'日';
+  document.getElementById('footer-date').textContent=D.generated_at;
+
+  const gRows=[['price','理論価格','円',2],['delta','Delta','',4],['gamma','Gamma','',8],['theta','Theta/日','円',0],['vega','Vega/IV1%','円',0],['rho','Rho','',4]];
+  document.getElementById('call-g').innerHTML=gRows.map(([k,l,u,d])=>`<div class="ri"><span class="rl">${l}</span><span class="rv">${cg[k]!=null?fmt(cg[k],d)+u:'-'}</span></div>`).join('');
+  document.getElementById('put-g').innerHTML=gRows.map(([k,l,u,d])=>`<div class="ri"><span class="rl">${l}</span><span class="rv">${pg[k]!=null?fmt(pg[k],d)+u:'-'}</span></div>`).join('');
+
+  const gexData=D.gex_by_strike||[];
+  const totalGEX=gexData.reduce((s,r)=>s+r.GEX,0);
+  const maxGR=gexData.reduce((a,b)=>b.GEX>a.GEX?b:a,{StrikePrice:0,GEX:0});
+  const gexPos=totalGEX>=0;
+  document.getElementById('gex-sum').innerHTML=`
+    <div class="ri"><span class="rl">Total GEX</span><span class="rv" style="color:${gexPos?'var(--green)':'var(--red)'}">${gexPos?'+':''}${fmt(totalGEX,0)}</span></div>
+    <div class="ri"><span class="rl">ゾーン</span><span class="rv" style="color:${gexPos?'var(--green)':'var(--red)'}">${gexPos?'GEX+ 安定化':'GEX- 不安定化'}</span></div>
+    <div class="ri"><span class="rl">Call Wall (GEX最大)</span><span class="rv" style="color:var(--green)">${fmt(maxGR.StrikePrice)}</span></div>
+    <div class="ri"><span class="rl">GammaFlip</span><span class="rv">${gf?fmt(gf):'データなし'}</span></div>`;
+
+  const atm=D.atm_strike,atmIV=(D.atm_iv_pct||38)/100;
+  const im=Math.round(S*atmIV*Math.sqrt(dte/365));
+  document.getElementById('im-sum').innerHTML=`
+    <div class="ri"><span class="rl">Implied Move</span><span class="rv">±${fmt(im)}（±${((im/S)*100).toFixed(1)}%）</span></div>
+    <div class="ri"><span class="rl">上限</span><span class="rv" style="color:var(--green)">${fmt(S+im)}</span></div>
+    <div class="ri"><span class="rl">下限</span><span class="rv" style="color:var(--red)">${fmt(S-im)}</span></div>
+    <div class="ri"><span class="rl">ATM行使価格</span><span class="rv">${fmt(atm)}</span></div>
+    <div class="ri"><span class="rl">残存日数</span><span class="rv">${dte}日（${D.expiry_date}満期）</span></div>`;
+
+  const pts=[
+    {l:'Call Wall',v:maxGR.StrikePrice,c:'var(--green)'},
+    {l:'GammaFlip',v:gf,c:'var(--purple)'},
+    {l:'MaxPain',v:mp,c:'var(--amber)'},
+    {l:'先物',v:S,c:'var(--blue)'},
+    {l:'Put Wall',v:S-im*0.8,c:'var(--red)'},
+  ].filter(p=>p.v>0).sort((a,b)=>b.v-a.v);
+  const mn=Math.min(...pts.map(p=>p.v)),mx=Math.max(...pts.map(p=>p.v)),rng=mx-mn||1;
+  document.getElementById('pricemap').innerHTML=
+    '<div style="position:relative;height:40px;margin:4px 0">'
+    +'<div style="position:absolute;top:14px;left:0;right:0;height:1px;background:var(--border)"></div>'
+    +pts.map(p=>{const pct=((p.v-mn)/rng*90+5).toFixed(1);return`<div style="position:absolute;left:${pct}%;transform:translateX(-50%);text-align:center"><div style="width:1.5px;height:16px;background:${p.c};margin:0 auto"></div><div style="font-size:9px;color:${p.c};font-family:var(--font);white-space:nowrap;margin-top:1px">${p.l}</div></div>`;}).join('')
+    +'</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">'
+    +pts.map(p=>`<span style="font-size:10px;color:${p.c};background:var(--bg3);padding:2px 7px;border-radius:4px;font-family:var(--font);border:1px solid var(--border)">${p.l}: ${fmt(p.v)}</span>`).join('')
+    +'</div>';
+
+  document.getElementById('tm-i-now').value=S;
+  document.getElementById('tm-i-mp').value=mp||'';
+  document.getElementById('tm-i-gf').value=gf||'';
+  const atmIVpct=D.atm_iv_pct||38;
+  document.getElementById('tm-i-imu').value=Math.round(S+S*atmIVpct/100*Math.sqrt(dte/365));
+  document.getElementById('tm-i-iml').value=Math.round(S-S*atmIVpct/100*Math.sqrt(dte/365));
+}
+
+function renderGEX(){
+  if(!D)return;
+  const S=D.underlying.close;
+  const gexData=(D.gex_by_strike||[]).filter(r=>r.GEX>0&&r.StrikePrice>=S*0.85&&r.StrikePrice<=S*1.25);
+  const totalGEX=(D.gex_by_strike||[]).reduce((s,r)=>s+r.GEX,0);
+  const maxGR=gexData.reduce((a,b)=>b.GEX>a.GEX?b:a,{StrikePrice:0,GEX:0});
+  const gf=D.gamma_flip;
+  const gexPos=totalGEX>=0;
+  document.getElementById('gex-cards').innerHTML=`
+    <div class="kpi"><div class="kpi-label">Total GEX</div><div class="kpi-value" style="color:${gexPos?'var(--green)':'var(--red)'}">${gexPos?'+':''}${fmt(totalGEX,0)}</div><div class="kpi-sub">${gexPos?'GEX+ 安定化':'GEX- 不安定化'}</div></div>
+    <div class="kpi"><div class="kpi-label">Call Wall（GEX最大）</div><div class="kpi-value kpi-up">${fmt(maxGR.StrikePrice)}</div><div class="kpi-sub">GEX: ${fmt(maxGR.GEX,0)}</div></div>
+    <div class="kpi"><div class="kpi-label">GammaFlip</div><div class="kpi-value">${gf?fmt(gf):'なし'}</div><div class="kpi-sub">GEX正負転換点</div></div>`;
+  if(gexChart)gexChart.destroy();
+  gexChart=new Chart(document.getElementById('gexChart'),{
+    type:'bar',
+    data:{labels:gexData.map(r=>fmt(r.StrikePrice)),datasets:[{data:gexData.map(r=>r.GEX),backgroundColor:gexData.map(r=>r.GEX>=0?'rgba(34,197,94,0.6)':'rgba(239,68,68,0.6)'),borderWidth:0,borderRadius:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#5a7090',maxTicksLimit:12,font:{family:'DM Mono',size:10}},grid:{color:'#1a2235'}},y:{ticks:{color:'#5a7090',font:{family:'DM Mono',size:10}},grid:{color:'#1a2235'}}}}
+  });
+}
+
+function renderIV(){
+  if(!D)return;
+  const S=D.underlying.close;
+  const rows=(D.strikes_summary||[]).filter(r=>r.iv>0.05&&r.strike>=S*0.85&&r.strike<=S*1.15);
+  if(smileChart)smileChart.destroy();
+  smileChart=new Chart(document.getElementById('smileChart'),{
+    type:'line',
+    data:{labels:rows.map(r=>fmt(r.strike)),datasets:[{data:rows.map(r=>+(r.iv*100).toFixed(2)),borderColor:'#a78bfa',backgroundColor:'rgba(167,139,250,0.1)',borderWidth:2,fill:true,tension:0.3,pointRadius:2,pointBackgroundColor:'#a78bfa'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#5a7090',maxTicksLimit:10,font:{family:'DM Mono',size:10}},grid:{color:'#1a2235'}},y:{title:{display:true,text:'IV (%)',color:'#5a7090',font:{size:10}},ticks:{color:'#5a7090',font:{family:'DM Mono',size:10}},grid:{color:'#1a2235'},min:25}}}
+  });
+  document.getElementById('iv-body').innerHTML=rows.map(r=>{
+    const isAtm=Math.abs(r.strike-S)<200;
+    return`<tr class="${isAtm?'hl':''}"><td>${fmt(r.strike)}${isAtm?' ★':''}</td><td>${pct(r.iv*100)}</td><td>${r.delta?r.delta.toFixed(4):'-'}</td><td>${r.call_close?fmt(r.call_close,0):'-'}</td><td>${r.theoretical?r.theoretical.toFixed(4):'-'}</td></tr>`;
+  }).join('');
+}
+
+function calcBS(){
+  const S=+document.getElementById('bs-s').value;
+  const K=+document.getElementById('bs-k').value;
+  const T=+document.getElementById('bs-t').value/252;
+  const sig=+document.getElementById('bs-sig').value/100;
+  const r=+document.getElementById('bs-r').value/100;
+  document.getElementById('bs-sv').textContent=fmt(S);
+  document.getElementById('bs-kv').textContent=fmt(K);
+  document.getElementById('bs-tv').textContent=document.getElementById('bs-t').value+'日';
+  document.getElementById('bs-sigv').textContent=(+document.getElementById('bs-sig').value).toFixed(1)+'%';
+  document.getElementById('bs-rv').textContent=(+document.getElementById('bs-r').value).toFixed(2)+'%';
+  if(T<=0||sig<=0)return;
+  const res=bs(S,K,T,sig,r,otType);
+  const intr=otType==='C'?Math.max(0,S-K):Math.max(0,K-S);
+  document.getElementById('bs-price').textContent=fmt(res.price,0)+'円';
+  document.getElementById('bs-intr').textContent=fmt(intr,0)+'円';
+  document.getElementById('bs-time').textContent=fmt(Math.max(0,res.price-intr),0)+'円';
+  document.getElementById('bs-greeks').innerHTML=`
+    <div class="ri"><span class="rl">Delta (Δ)</span><span class="rv">${res.delta.toFixed(4)}</span></div>
+    <div class="ri"><span class="rl">Gamma (Γ)</span><span class="rv">${res.gamma.toFixed(8)}</span></div>
+    <div class="ri"><span class="rl">Theta (Θ) / 日</span><span class="rv" style="color:var(--red)">${fmt(res.theta,0)}円</span></div>
+    <div class="ri"><span class="rl">Vega (ν) / IV1%</span><span class="rv" style="color:var(--blue)">${fmt(res.vega,0)}円</span></div>
+    <div class="ri"><span class="rl">Rho (ρ)</span><span class="rv">${res.rho.toFixed(4)}</span></div>
+    <div class="ri"><span class="rl">ブレークイーブン</span><span class="rv">${fmt(otType==='C'?K+res.price:K-res.price,0)}円</span></div>`;
+  updatePL(S,K,T,sig,r,res.price);
+}
+
+function updatePL(S,K,T,sig,r,prem){
+  const isSell=plType==='S';
+  const isPut=otType==='P';
+  const prices=[],vals=[];
+  for(let i=0;i<=80;i++){
+    const sp=S*0.75+S*0.5*i/80;
+    prices.push(sp);
+    let pl;
+    if(!isPut&&!isSell)pl=Math.max(0,sp-K)-prem;
+    else if(!isPut&&isSell)pl=prem-Math.max(0,sp-K);
+    else if(isPut&&!isSell)pl=Math.max(0,K-sp)-prem;
+    else pl=prem-Math.max(0,K-sp);
+    vals.push(pl);
+  }
+  const be=!isPut?K+prem:K-prem;
+  document.getElementById('pl-be').textContent=fmt(be,0)+'円';
+  document.getElementById('pl-min').textContent=fmt(Math.min(...vals),0)+'円';
+  if(plChart)plChart.destroy();
+  plChart=new Chart(document.getElementById('plChart'),{
+    type:'line',
+    data:{labels:prices.map(p=>fmt(p,0)),datasets:[
+      {data:vals,borderColor:'#3b82f6',borderWidth:1.5,fill:false,pointRadius:0,tension:0.1},
+      {data:prices.map(()=>0),borderColor:'rgba(90,112,144,0.4)',borderWidth:1,borderDash:[4,4],pointRadius:0}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#5a7090',maxTicksLimit:6,font:{family:'DM Mono',size:9}},grid:{color:'#1a2235'}},y:{ticks:{color:'#5a7090',font:{family:'DM Mono',size:9}},grid:{color:'#1a2235'}}}}
+  });
+}
+
+function setOT(t,el){otType=t;document.querySelectorAll('#sec-bs .seg:first-of-type button').forEach(b=>b.classList.remove('active'));el.classList.add('active');calcBS();}
+function setPT(t,el){plType=t;document.querySelectorAll('#sec-bs .card:nth-child(2) .seg button').forEach(b=>b.classList.remove('active'));el.classList.add('active');calcBS();}
+
+function calcIVInv(){
+  const mkt=+document.getElementById('ivc-mkt').value;
+  const S=+document.getElementById('ivc-s').value;
+  const K=+document.getElementById('ivc-k').value;
+  const T=+document.getElementById('ivc-t').value/252;
+  document.getElementById('ivc-mktv').textContent=fmt(mkt)+'円';
+  document.getElementById('ivc-sv').textContent=fmt(S)+'円';
+  document.getElementById('ivc-kv').textContent=fmt(K)+'円';
+  document.getElementById('ivc-tv').textContent=document.getElementById('ivc-t').value+'日';
+  let lo=0.01,hi=5;
+  for(let i=0;i<100;i++){const mid=(lo+hi)/2;const p=bs(S,K,T,mid,0.005,'C').price;if(Math.abs(p-mkt)<0.5)break;if(p<mkt)lo=mid;else hi=mid;}
+  const iv=((lo+hi)/2*100);
+  document.getElementById('ivc-result').textContent=iv.toFixed(1)+'%';
+  document.getElementById('ivc-level').textContent=iv<15?'低（15%未満）':iv<25?'普通（15-25%）':iv<40?'高（25-40%）':'非常に高い（40%+）';
+}
+
+const mapColors={
+  call:{border:'#22c55e',bg:'rgba(34,197,94,0.06)',tag:{bg:'#14532d',c:'#22c55e'}},
+  put:{border:'#ef4444',bg:'rgba(239,68,68,0.06)',tag:{bg:'#7f1d1d',c:'#ef4444'}},
+  mp:{border:'#f59e0b',bg:'rgba(245,158,11,0.06)',tag:{bg:'#78350f',c:'#f59e0b'}},
+  gf:{border:'#a78bfa',bg:'rgba(167,139,250,0.06)',tag:{bg:'#3b1f6e',c:'#a78bfa'}},
+  ma:{border:'#64748b',bg:'rgba(100,116,139,0.05)',tag:{bg:'#1e293b',c:'#94a3b8'}},
+  vwap:{border:'#3b82f6',bg:'rgba(59,130,246,0.06)',tag:{bg:'#1e3a5f',c:'#3b82f6'}},
+  bb:{border:'#f472b6',bg:'rgba(244,114,182,0.06)',tag:{bg:'#831843',c:'#f472b6'}},
+  im:{border:'#2dd4bf',bg:'rgba(45,212,191,0.06)',tag:{bg:'#134e4a',c:'#2dd4bf'}},
+  now:{border:'#3b82f6',bg:'rgba(59,130,246,0.1)',tag:{bg:'#1d4ed8',c:'#fff'}},
+};
+
+function renderTechMap(){
+  const iv=(id)=>parseFloat(document.getElementById(id).value)||0;
+  const now=iv('tm-i-now'),mp=iv('tm-i-mp'),gf=iv('tm-i-gf');
+  const cw=iv('tm-i-cw'),pw=iv('tm-i-pw'),imu=iv('tm-i-imu'),iml=iv('tm-i-iml');
+  const wma5=iv('tm-i-wma5'),wma20=iv('tm-i-wma20'),dten=iv('tm-i-dten'),wbase=iv('tm-i-wbase'),mten=iv('tm-i-mten');
+  const vwap=iv('tm-i-vwap'),bb2=iv('tm-i-bb2'),bb3=iv('tm-i-bb3');
+
+  document.getElementById('tm-now').textContent=fmt(now);
+  document.getElementById('tm-mp').textContent=fmt(mp);
+  document.getElementById('tm-mpdiff').textContent='先物差 '+fmtS(mp-now);
+  document.getElementById('tm-gf').textContent=fmt(gf);
+
+  const levels=[
+    {p:cw,cat:'call',tag:'Call壁',desc:'04月限Global Call Wall。供給の最終上蓋'},
+    {p:imu,cat:'im',tag:'IM上限',desc:'Implied Move参考上限。踏み上げ帯上限'},
+    {p:mp,cat:'mp',tag:'MaxPain',desc:'SQ引力中心、先物比'+fmtS(mp-now)+'円の吸い寄せ候補'},
+    {p:gf,cat:'gf',tag:'GammaFlip',desc:'ここを超えるとディーラーヘッジが安定化へ転換'},
+    {p:wma5,p2:wma20,cat:'ma',tag:'週足MA5/20',desc:'週足MA(5)/MA(20)クラスター。戻り売りが重なる帯',isRange:true},
+    {p:dten,cat:'ma',tag:'日足転換線',desc:'短期反発の上限候補、トレンド分岐点'},
+    {p:wbase,cat:'ma',tag:'週足基準線',desc:'VWAPを超えた先の次の抵抗帯'},
+    {p:vwap,cat:'vwap',tag:'60分VWAP',desc:'週明け最初の攻防ライン'},
+    {p:now,cat:'now',tag:'現在値',desc:'先物'+fmt(now)+'円。現在のポジション',isCurrent:true},
+    {p:bb2,cat:'bb',tag:'BB -2σ',desc:'60分-2σから日足-2σの下方向ストップ帯'},
+    {p:pw,cat:'put',tag:'Put Wall',desc:'04月限Put Wall。Net OI最大PUT偏重水準。強い防波堤'},
+    {p:mten,cat:'ma',tag:'月足転換線',desc:'割れると中期調整が本格化するシグナル'},
+    {p:iml,p2:bb3,cat:'im',tag:'IM下限/BB-3σ',desc:'ATM PUT IV参考下限と日足-3σの下柵',isRange:true},
+  ].filter(l=>l.p>0).sort((a,b)=>b.p-a.p);
+
+  document.getElementById('tech-map-body').innerHTML=levels.map(l=>{
+    const mc=mapColors[l.cat]||mapColors.ma;
+    const pLabel=l.isRange&&l.p2?`${fmt(l.p2)} – ${fmt(l.p)}`:fmt(l.p);
+    return`<div class="map-row">
+      <div class="map-price${l.isCurrent?' current':''}">${pLabel}</div>
+      <div class="map-bar${l.isCurrent?' current':''}" style="border-left-color:${mc.border};background:${mc.bg}">
+        <span class="map-tag" style="background:${mc.tag.bg};color:${mc.tag.c}">${l.tag}</span>
+        <span class="map-desc">${l.desc}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function applyTechMap(){renderTechMap();showSub('tm-map',document.querySelector('#sec-techmap .stab'),null);}
+
+async function loadGitHub(){
+  const user=document.getElementById('gh-user').value.trim();
+  const repo=document.getElementById('gh-repo').value.trim();
+  const url=`https://raw.githubusercontent.com/${user}/${repo}/main/data/analysis_latest.json`;
+  const msg=document.getElementById('load-msg');
+  msg.style.color='var(--text3)';msg.textContent='読込中...';
+  try{
+    const r=await fetch(url);
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    D=await r.json();
+    applyData();
+    msg.style.color='var(--green)';msg.textContent='読込成功: '+D.generated_at+' のデータを表示中';
+    showSec('dashboard',null);
+  }catch(e){
+    msg.style.color='var(--red)';msg.textContent='エラー: '+e.message;
+  }
+}
+
+function loadPaste(){
+  try{
+    D=JSON.parse(document.getElementById('json-paste').value.trim());
+    applyData();
+    document.getElementById('load-msg').style.color='var(--green)';
+    document.getElementById('load-msg').textContent='JSON読込成功';
+    showSec('dashboard',null);
+  }catch(e){
+    document.getElementById('load-msg').style.color='var(--red)';
+    document.getElementById('load-msg').textContent='JSONエラー: '+e.message;
+  }
+}
+
+function applyData(){
+  if(!D)return;
+  renderDashboard();
+  document.getElementById('bs-s').value=D.underlying.close;
+  document.getElementById('bs-k').value=D.atm_strike||D.underlying.close;
+  document.getElementById('bs-t').value=D.dte||12;
+  document.getElementById('bs-sig').value=D.atm_iv_pct||38;
+  document.getElementById('ivc-s').value=D.underlying.close;
+  document.getElementById('ivc-k').value=D.atm_strike||D.underlying.close;
+  document.getElementById('ivc-t').value=D.dte||12;
+}
+
+calcBS();
+renderTechMap();
+</script>
+</body>
+</html>
