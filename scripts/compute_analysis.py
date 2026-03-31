@@ -286,7 +286,7 @@ def analyze_month(df_m, S, month_str, today):
         "mp_diff":         round(max_pain - S),
         "gamma_flip":      gamma_flip,
         "total_gex_m":     total_gex,
-        "gex_pos":         gex_pos,
+        "gex_pos":         bool(gex_pos),
         "call_wall":       call_wall,
         "put_wall":        put_wall,
         "pcr":             pcr,
@@ -318,8 +318,10 @@ def main():
 
     today = date.today()
 
-    # 全限月を取得してソート
-    months = sorted(df["ContractMonth"].dropna().unique().tolist())
+    # 全限月を取得してソート（YYYYMM形式=6桁の月次限月のみ対象、週次限月は除外）
+    all_months = df["ContractMonth"].dropna().unique().tolist()
+    months = sorted([m for m in all_months if len(str(m).strip()) == 6])
+    log.info("月次限月のみ処理: %s", months)
     log.info("検出された限月: %s", months)
 
     # 限月別分析
@@ -359,7 +361,17 @@ def main():
     }
 
     out_path = DATA_DIR / "analysis_latest.json"
-    out_path.write_text(json.dumps(out, ensure_ascii=False, indent=2))
+    class SafeEncoder(json.JSONEncoder):
+        def default(self, obj):
+            import numpy as np
+            if isinstance(obj, (np.bool_, bool)):
+                return bool(obj)
+            if isinstance(obj, (np.integer,)):
+                return int(obj)
+            if isinstance(obj, (np.floating,)):
+                return float(obj)
+            return super().default(obj)
+    out_path.write_text(json.dumps(out, ensure_ascii=False, indent=2, cls=SafeEncoder))
     log.info("保存完了: %s", out_path)
 
     # 限月別サマリーCSVも出力
