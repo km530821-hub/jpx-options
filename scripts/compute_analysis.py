@@ -1,22 +1,22 @@
 """
 compute_analysis.py
-新列構造（2026年2月24日以降）対応版
-1行 = 1行使価格のコール・プット両方が入っている横持ち形式
+全限月対応版 + MaxPain ATM±30%範囲計算 + PCR + GammaFlip改善
+2026年2月24日以降の新列構造対応（横持ち形式）
 """
 
 import json
 import math
 import logging
 import pandas as pd
-import numpy as np
 from pathlib import Path
 from datetime import date
+from calendar import monthrange
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
-
 DATA_DIR = Path("data")
 
+# ── ブラック・ショールズ ──────────────────────────────
 
 def norm_cdf(x):
     return 0.5 * (1 + math.erf(x / math.sqrt(2)))
@@ -32,44 +32,275 @@ def bs_greeks(S, K, T, sigma, opt_type, r=0.005):
     d2 = d1 - sigma * sq
     pdf1 = norm_pdf(d1)
     gamma = pdf1 / (S * sigma * sq)
-    vega = S * pdf1 * sq / 100
+    vega  = S * pdf1 * sq / 100
     if opt_type == "C":
+        price = S * norm_cdf(d1) - K * math.exp(-r * T) * norm_cdf(d2)
         delta = norm_cdf(d1)
         theta = (-S * pdf1 * sigma / (2 * sq) - r * K * math.exp(-r * T) * norm_cdf(d2)) / 252
-        price = S * norm_cdf(d1) - K * math.exp(-r * T) * norm_cdf(d2)
-        rho = K * T * math.exp(-r * T) * norm_cdf(d2) / 100
+        rho   = K * T * math.exp(-r * T) * norm_cdf(d2) / 100
     else:
+        price = K * math.exp(-r * T) * norm_cdf(-d2) - S * norm_cdf(-d1)
         delta = norm_cdf(d1) - 1
         theta = (-S * pdf1 * sigma / (2 * sq) + r * K * math.exp(-r * T) * norm_cdf(-d2)) / 252
-        price = K * math.exp(-r * T) * norm_cdf(-d2) - S * norm_cdf(-d1)
-        rho = -K * T * math.exp(-r * T) * norm_cdf(-d2) / 100
-    return {"price": round(price, 2), "delta": round(delta, 4), "gamma": round(gamma, 8),
-            "theta": round(theta, 2), "vega": round(vega, 4), "rho": round(rho, 4)}
+        rho   = -K * T * math.exp(-r * T) * norm_cdf(-d2) / 100
+    return {
+        "price": round(price, 2), "delta": round(delta, 4),
+        "gamma": round(gamma, 8), "theta": round(theta, 2),
+        "vega":  round(vega, 4),  "rho":   round(rho, 4),
+    }
 
+# ── 満期日（第2金曜日）─────────────────────────────
 
 def expiry_date(contract_month_dt):
-    """限月の第2金曜日を返す"""
-    from calendar import monthrange
     y, m = int(contract_month_dt.year), int(contract_month_dt.month)
-    days_in_month = monthrange(y, m)[1]
-    fridays = [date(y, m, d) for d in range(1, days_in_month + 1)
-               if date(y, m, d).weekday() == 4]
+    days = monthrange(y, m)[1]
+    fridays = [date(y, m, d) for d in range(1, days + 1) if date(y, m, d).weekday() == 4]
     return fridays[1] if len(fridays) >= 2 else fridays[0]
 
+# ── MaxPain（ATM±30%の行使価格のみ対象）──────────────
 
 def calc_max_pain(df, strikes, S):
-    """行使価格ごとの痛みの総和を計算しMinを返す"""
+    """
+    MaxPain = オプション売り手の損失が最小になる行使価格。
+    ATM ± 30% の行使価格のみを対象にして計算。
+    OI の代用として CallClose / TheoreticalPrice を使用。
+    コールはk_exp超で損失が発生、プットはk_exp未満で損失が発生。
+    """
+    lower = S * 0.70
+    upper = S * 1.30
+    target_strikes = [k for k in strikes if lower <= k <= upper]
+    if not target_strikes:
+        target_strikes = strikes  # フォールバック
+
+    # OI代用: CallClose（終値）を優先、なければTheoreticalPrice
+    def get_oi(row):
+        cc = pd.to_numeric(row.get("CallClose"), errors="coerce")
+        if not pd.isna(cc) and cc > 0:
+            return float(cc)
+        tp = pd.to_numeric(row.get("TheoreticalPrice"), errors="coerce")
+        return float(tp) if not pd.isna(tp) and tp > 0 else 1.0
+
     pain = {}
-    for k_exp in strikes:
+    for k_exp in target_strikes:
         total = 0.0
         for _, row in df.iterrows():
-            k = row["StrikePrice"]
-            oi = max(float(row.get("OI_proxy", 1)), 1)
-            total += oi * max(0, k - k_exp)      # コール側
-            total += oi * max(0, k_exp - k)      # プット側
+            k   = row["StrikePrice"]
+            oi  = get_oi(row)
+            # コール：k_exp < k の場合、コールが行使され売り手に損失
+            total += oi * max(0.0, k - k_exp)
+            # プット：k_exp > k の場合、プットが行使され売り手に損失
+            total += oi * max(0.0, k_exp - k)
         pain[k_exp] = total
-    return min(pain, key=pain.get) if pain else S
 
+    mp = min(pain, key=pain.get) if pain else S
+    log.info("MaxPain計算: ATM=%.0f 対象行使価格数=%d 結果=%.0f", S, len(target_strikes), mp)
+    return mp
+
+# ── PCR（Put/Call Ratio）─────────────────────────────
+
+def calc_pcr(df, S):
+    """
+    PCR = PUT終値合計 / CALL終値合計（ATM±30%の行使価格のみ）
+    """
+    lower, upper = S * 0.70, S * 1.30
+    df_f = df[(df["StrikePrice"] >= lower) & (df["StrikePrice"] <= upper)].copy()
+    call_sum = pd.to_numeric(df_f["CallClose"], errors="coerce").fillna(0).sum()
+    # PutCloseは新形式では直接ないため TheoreticalPrice の代用
+    # コール終値合計 vs 全体の対称性からPCRを推定
+    # → call_sum が有効な場合、strike分布の非対称性からPCRを算出
+    # 実際のOIがないため、コール終値の逆数的推定
+    # 有効な近似: PCR = PUT偏重OI推定 / CALL偏重OI推定
+    # ATM以下の終値合計(プット寄り) / ATM以上の終値合計(コール寄り)
+    atm = min(df_f["StrikePrice"].dropna().tolist(), key=lambda k: abs(k - S)) if not df_f.empty else S
+    call_side = pd.to_numeric(df_f[df_f["StrikePrice"] >= atm]["CallClose"], errors="coerce").fillna(0).sum()
+    put_side  = pd.to_numeric(df_f[df_f["StrikePrice"] <  atm]["CallClose"], errors="coerce").fillna(0).sum()
+    if call_side > 0:
+        pcr = round(put_side / call_side, 3)
+    else:
+        pcr = None
+    log.info("PCR推定: call_side=%.0f put_side=%.0f PCR=%s", call_side, put_side, pcr)
+    return pcr
+
+# ── GEX・GammaFlip ──────────────────────────────────
+
+def calc_gex(df, S, T, r=0.005):
+    gex_list = []
+    for _, row in df.iterrows():
+        K  = row["StrikePrice"]
+        iv = row["IV"]
+        if pd.isna(K) or pd.isna(iv) or iv <= 0.05:
+            continue
+        iv_dec = iv if iv < 1 else iv / 100
+        oi = float(pd.to_numeric(row.get("CallClose"), errors="coerce") or 1)
+        g  = bs_greeks(S, K, T, iv_dec, "C", r)
+        if g:
+            gex_list.append({
+                "StrikePrice": K,
+                "GEX": round(g["gamma"] * oi * S * S / 100, 2)
+            })
+    if not gex_list:
+        return pd.DataFrame(columns=["StrikePrice", "GEX"])
+    return pd.DataFrame(gex_list).groupby("StrikePrice")["GEX"].sum().reset_index()
+
+def find_gamma_flip(gex_df, S):
+    """
+    先物価格に最も近いGEXの正→負転換点を返す。
+    先物より上側と下側の両方を探し、より近い方を採用。
+    """
+    if gex_df.empty:
+        return None
+
+    flip = None
+    best_dist = float("inf")
+
+    gex_sorted = gex_df.sort_values("StrikePrice").reset_index(drop=True)
+
+    for i in range(len(gex_sorted) - 1):
+        g1 = gex_sorted.iloc[i]["GEX"]
+        g2 = gex_sorted.iloc[i + 1]["GEX"]
+        k1 = gex_sorted.iloc[i]["StrikePrice"]
+        k2 = gex_sorted.iloc[i + 1]["StrikePrice"]
+        if g1 >= 0 > g2 or g1 < 0 <= g2:
+            # 転換点の中点を使用
+            mid = (k1 + k2) / 2
+            dist = abs(mid - S)
+            if dist < best_dist:
+                best_dist = dist
+                flip = round((k1 + k2) / 2)
+
+    return flip
+
+# ── ATM IV取得（有効値のみ）─────────────────────────
+
+def get_atm_iv(df, S):
+    """
+    ATM付近の有効なIV（0.05超）を取得。
+    先物に最も近い行使価格から順に探す。
+    """
+    df_valid = df[(df["IV"].notna()) & (df["IV"] > 0.05)].copy()
+    if df_valid.empty:
+        return 0.35
+    df_valid["dist"] = (df_valid["StrikePrice"] - S).abs()
+    return float(df_valid.sort_values("dist").iloc[0]["IV"])
+
+# ── 1限月分の分析 ──────────────────────────────────
+
+def analyze_month(df_m, S, month_str, today):
+    """1限月分のデータを分析してdictを返す"""
+    cmonth_dt = df_m["ContractMonthDt"].dropna()
+    if cmonth_dt.empty:
+        return None
+    cmonth_dt = cmonth_dt.iloc[0]
+
+    exp  = expiry_date(cmonth_dt)
+    dte  = max((exp - today).days, 0)
+    T    = max(dte, 1) / 252.0
+
+    strikes = sorted(df_m["StrikePrice"].dropna().unique().tolist())
+    if not strikes:
+        return None
+
+    # ATM
+    atm_strike = min(strikes, key=lambda k: abs(k - S))
+    atm_diff   = round(atm_strike - S)
+
+    # ATM IV
+    atm_iv_raw = get_atm_iv(df_m, S)
+    atm_iv_dec = atm_iv_raw if atm_iv_raw < 1 else atm_iv_raw / 100
+
+    # グリークス
+    call_g = bs_greeks(S, atm_strike, T, atm_iv_dec, "C")
+    put_g  = bs_greeks(S, atm_strike, T, atm_iv_dec, "P")
+
+    # MaxPain（ATM±30%）
+    max_pain = calc_max_pain(df_m, strikes, S)
+
+    # PCR
+    pcr = calc_pcr(df_m, S)
+
+    # GEX
+    gex_df = calc_gex(df_m, S, T)
+    total_gex = round(gex_df["GEX"].sum() / 1_000_000, 2) if not gex_df.empty else 0.0
+    gex_pos   = total_gex >= 0
+
+    # GammaFlip
+    gamma_flip = find_gamma_flip(gex_df, S)
+
+    # Call Wall / Put Wall（GEX最大・最小の行使価格）
+    if not gex_df.empty:
+        call_wall = float(gex_df.loc[gex_df["GEX"].idxmax(), "StrikePrice"])
+        put_wall  = float(gex_df.loc[gex_df["GEX"].idxmin(), "StrikePrice"]) if (gex_df["GEX"] < 0).any() else None
+    else:
+        call_wall = put_wall = None
+
+    # CALL IV / PUT IV（ATM付近）
+    iv_near = df_m[(df_m["IV"].notna()) & (df_m["IV"] > 0.05)].copy()
+    iv_near["dist"] = (iv_near["StrikePrice"] - S).abs()
+    iv_near_sorted = iv_near.sort_values("dist")
+
+    call_iv = round(atm_iv_dec * 100, 2)  # ATM IVをコールIVとして使用
+    # プットIVはATMより少し低い行使価格のIV
+    put_side = iv_near_sorted[iv_near_sorted["StrikePrice"] < atm_strike]
+    put_iv   = round(float(put_side.iloc[0]["IV"]) * 100, 2) if not put_side.empty else call_iv
+    if put_iv > 1:  # パーセント表記チェック
+        put_iv = round(put_iv / 100, 2)
+
+    rr = round(call_iv - put_iv, 2)
+
+    # Implied Move（ATM IV × √(DTE/365) × 先物）
+    im     = round(S * atm_iv_dec * (dte / 365) ** 0.5) if dte > 0 else None
+    im_pct = round(im / S * 100, 1) if im else None
+
+    # IV・価格サマリー（ATM±30%）
+    lower, upper = S * 0.70, S * 1.30
+    strikes_summary = []
+    for k in strikes:
+        if not (lower <= k <= upper):
+            continue
+        row = df_m[df_m["StrikePrice"] == k]
+        if row.empty:
+            continue
+        r = row.iloc[0]
+        iv_v = float(r["IV"]) if not pd.isna(r["IV"]) else None
+        if iv_v and iv_v < 0.05:
+            iv_v = None  # 無効値除外
+        strikes_summary.append({
+            "strike":      k,
+            "iv":          iv_v,
+            "call_close":  float(r["CallClose"])      if not pd.isna(r.get("CallClose", float("nan")))      else None,
+            "theoretical": float(r["TheoreticalPrice"]) if not pd.isna(r.get("TheoreticalPrice", float("nan"))) else None,
+            "delta":       float(r["Delta"])           if "Delta" in r and not pd.isna(r.get("Delta", float("nan"))) else None,
+        })
+
+    return {
+        "month":           month_str,
+        "expiry_date":     exp.isoformat(),
+        "dte":             dte,
+        "atm_strike":      atm_strike,
+        "atm_diff":        atm_diff,
+        "atm_iv_pct":      call_iv,
+        "call_iv":         call_iv,
+        "put_iv":          put_iv,
+        "rr":              rr,
+        "max_pain":        max_pain,
+        "mp_diff":         round(max_pain - S),
+        "gamma_flip":      gamma_flip,
+        "total_gex_m":     total_gex,
+        "gex_pos":         gex_pos,
+        "call_wall":       call_wall,
+        "put_wall":        put_wall,
+        "pcr":             pcr,
+        "im":              im,
+        "im_pct":          im_pct,
+        "im_upper":        round(atm_strike + im) if im else None,
+        "im_lower":        round(atm_strike - im) if im else None,
+        "atm_call_greeks": call_g,
+        "atm_put_greeks":  put_g,
+        "gex_by_strike":   gex_df.to_dict(orient="records"),
+        "strikes_summary": strikes_summary,
+    }
+
+# ── メイン ────────────────────────────────────────
 
 def main():
     csv_path = DATA_DIR / "options_latest.csv"
@@ -78,120 +309,71 @@ def main():
         raise SystemExit(1)
 
     df = pd.read_csv(csv_path, dtype={"ContractMonth": str})
-    df["ContractMonth"] = df["ContractMonth"].str.strip()
+    df["ContractMonth"]   = df["ContractMonth"].str.strip()
     df["ContractMonthDt"] = pd.to_datetime(df["ContractMonth"], format="%Y%m", errors="coerce")
 
-    # 原資産価格
+    # 原資産価格（日経225現物終値）
     S = float(df["UnderlyingClose"].dropna().iloc[0]) if not df["UnderlyingClose"].dropna().empty else 38000.0
-    log.info("原資産価格: %.2f", S)
+    log.info("原資産価格（日経225現物終値）: %.2f", S)
 
-    # OIプロキシ（新形式はOI列なし → TheoreticalPriceを代用）
-    df["OI_proxy"] = pd.to_numeric(df["TheoreticalPrice"], errors="coerce").fillna(1).clip(lower=1)
+    today = date.today()
+
+    # 全限月を取得してソート
+    months = sorted(df["ContractMonth"].dropna().unique().tolist())
+    log.info("検出された限月: %s", months)
+
+    # 限月別分析
+    month_results = []
+    for month_str in months:
+        df_m = df[df["ContractMonth"] == month_str].copy()
+        log.info("分析中: %s (%d行)", month_str, len(df_m))
+        result = analyze_month(df_m, S, month_str, today)
+        if result:
+            month_results.append(result)
+
+    if not month_results:
+        log.error("分析結果なし")
+        raise SystemExit(1)
 
     # 直近限月
-    valid_months = df["ContractMonth"].dropna()
-    if valid_months.empty:
-        log.error("ContractMonth が空です")
-        raise SystemExit(1)
-    nearest_month = valid_months.sort_values().iloc[0]
-    df_near = df[df["ContractMonth"] == nearest_month].copy()
-    log.info("直近限月: %s  行数: %d", nearest_month, len(df_near))
+    nearest = month_results[0]
 
-    strikes = sorted(df_near["StrikePrice"].dropna().unique().tolist())
-    if not strikes:
-        log.error("行使価格が取得できません")
-        raise SystemExit(1)
-
-    # ATM
-    atm_strike = min(strikes, key=lambda k: abs(k - S))
-
-    # 満期日・残存日数
-    cmonth_dt = df_near["ContractMonthDt"].dropna().iloc[0]
-    exp = expiry_date(cmonth_dt)
-    T = max((exp - date.today()).days, 1) / 252.0
-
-    # ATM IV: 0.01は無効値なので除外し、先物に最も近い有効なIVを使用
-    iv_valid = df_near[(df_near["IV"].notna()) & (df_near["IV"] > 0.05)].copy()
-    iv_valid["dist"] = (iv_valid["StrikePrice"] - S).abs()
-    if not iv_valid.empty:
-        atm_iv = float(iv_valid.sort_values("dist").iloc[0]["IV"])
-    else:
-        atm_iv = 0.35
-    # IVは小数表記（0.376 = 37.6%）
-    atm_iv_dec = atm_iv if atm_iv < 1 else atm_iv / 100
-
-    log.info("ATM行使価格: %.0f  IV(raw): %.4f  T: %.4f年", atm_strike, atm_iv, T)
-
-    # グリークス
-    atm_call_greeks = bs_greeks(S, atm_strike, T, atm_iv_dec, "C")
-    atm_put_greeks  = bs_greeks(S, atm_strike, T, atm_iv_dec, "P")
-
-    # マックスペイン
-    max_pain = calc_max_pain(df_near, strikes, S)
-    log.info("マックスペイン: %.0f", max_pain)
-
-    # GEX（簡易計算）
-    gex_list = []
-    for _, row in df_near.iterrows():
-        K = row["StrikePrice"]
-        iv = row["IV"]
-        if pd.isna(K) or pd.isna(iv) or iv <= 0.05:
-            continue
-        iv_dec = iv if iv < 1 else iv / 100
-        oi = float(row.get("OI_proxy", 1))
-        g = bs_greeks(S, K, T, iv_dec, "C")
-        if g:
-            gex_list.append({"StrikePrice": K, "GEX": round(g["gamma"] * oi * S * S / 100, 2)})
-
-    gex_df = pd.DataFrame(gex_list).groupby("StrikePrice")["GEX"].sum().reset_index()
-
-    # ガンマフリップ
-    gamma_flip = None
-    above = gex_df[gex_df["StrikePrice"] >= S].reset_index(drop=True)
-    for i in range(len(above) - 1):
-        if above.iloc[i]["GEX"] >= 0 > above.iloc[i+1]["GEX"]:
-            gamma_flip = float(above.iloc[i]["StrikePrice"])
-            break
-
-    # 行使価格別IV・価格サマリー
-    strikes_summary = []
-    for k in strikes:
-        row = df_near[df_near["StrikePrice"] == k]
-        if row.empty:
-            continue
-        r = row.iloc[0]
-        iv_v = float(r["IV"]) if not pd.isna(r["IV"]) else None
-        strikes_summary.append({
-            "strike": k,
-            "iv": iv_v,
-            "call_close": float(r["CallClose"]) if not pd.isna(r.get("CallClose", float("nan"))) else None,
-            "theoretical": float(r["TheoreticalPrice"]) if not pd.isna(r.get("TheoreticalPrice", float("nan"))) else None,
-            "delta": float(r["Delta"]) if "Delta" in r and not pd.isna(r.get("Delta", float("nan"))) else None,
-        })
-
+    # 全体出力
     out = {
-        "generated_at": date.today().isoformat(),
-        "underlying": {"name": "日経225", "close": S},
-        "nearest_month": nearest_month,
-        "expiry_date": exp.isoformat(),
-        "dte": (exp - date.today()).days,
-        "max_pain": max_pain,
-        "gamma_flip": gamma_flip,
-        "atm_strike": atm_strike,
-        "atm_iv_pct": round(atm_iv_dec * 100, 2),
-        "atm_call_greeks": atm_call_greeks,
-        "atm_put_greeks": atm_put_greeks,
-        "gex_by_strike": gex_df.to_dict(orient="records"),
-        "strikes_summary": strikes_summary,
+        "generated_at":    today.isoformat(),
+        "underlying":      {"name": "日経225", "close": S},
+        # 後方互換性のため直近限月の値もトップレベルに残す
+        "nearest_month":   nearest["month"],
+        "expiry_date":     nearest["expiry_date"],
+        "dte":             nearest["dte"],
+        "max_pain":        nearest["max_pain"],
+        "gamma_flip":      nearest["gamma_flip"],
+        "atm_strike":      nearest["atm_strike"],
+        "atm_iv_pct":      nearest["atm_iv_pct"],
+        "atm_call_greeks": nearest["atm_call_greeks"],
+        "atm_put_greeks":  nearest["atm_put_greeks"],
+        "gex_by_strike":   nearest["gex_by_strike"],
+        "strikes_summary": nearest["strikes_summary"],
+        # 全限月データ
+        "months":          month_results,
     }
 
     out_path = DATA_DIR / "analysis_latest.json"
     out_path.write_text(json.dumps(out, ensure_ascii=False, indent=2))
-    log.info("分析結果保存: %s", out_path)
+    log.info("保存完了: %s", out_path)
 
-    gex_df.to_csv(DATA_DIR / "greeks_latest.csv", index=False, encoding="utf-8-sig")
-    log.info("完了")
-
+    # 限月別サマリーCSVも出力
+    summary_rows = []
+    for m in month_results:
+        summary_rows.append({
+            "month": m["month"], "dte": m["dte"],
+            "atm": m["atm_strike"], "max_pain": m["max_pain"], "mp_diff": m["mp_diff"],
+            "gamma_flip": m["gamma_flip"], "total_gex_m": m["total_gex_m"], "gex_pos": m["gex_pos"],
+            "call_iv": m["call_iv"], "put_iv": m["put_iv"], "rr": m["rr"],
+            "pcr": m["pcr"], "im": m["im"], "im_pct": m["im_pct"],
+        })
+    pd.DataFrame(summary_rows).to_csv(DATA_DIR / "summary_latest.csv", index=False, encoding="utf-8-sig")
+    log.info("サマリーCSV保存完了")
 
 if __name__ == "__main__":
     main()
