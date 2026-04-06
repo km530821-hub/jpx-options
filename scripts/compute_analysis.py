@@ -185,7 +185,7 @@ def get_atm_iv(df, S):
 
 # ── 1限月分の分析 ──────────────────────────────────
 
-def analyze_month(df_m, S, month_str, today):
+def analyze_month(df_m, S, month_str, today, oi_data=None):
     """1限月分のデータを分析してdictを返す"""
     cmonth_dt = df_m["ContractMonthDt"].dropna()
     if cmonth_dt.empty:
@@ -212,11 +212,37 @@ def analyze_month(df_m, S, month_str, today):
     call_g = bs_greeks(S, atm_strike, T, atm_iv_dec, "C")
     put_g  = bs_greeks(S, atm_strike, T, atm_iv_dec, "P")
 
-    # MaxPain（ATM±30%）
-    max_pain = calc_max_pain(df_m, strikes, S)
+    # MaxPain（実OIがあれば使用、なければ終値代用）
+    if oi_data:
+        # 実OI使用
+        lower, upper = S * 0.70, S * 1.30
+        oi_filtered = {k: v for k, v in oi_data.items() if lower <= k <= upper}
+        if oi_filtered:
+            pain = {}
+            for k_exp in oi_filtered:
+                total = sum(v["call_oi"] * max(0, k - k_exp) + v["put_oi"] * max(0, k_exp - k)
+                           for k, v in oi_filtered.items())
+                pain[k_exp] = total
+            max_pain = min(pain, key=pain.get) if pain else S
+            log.info("MaxPain(実OI): %.0f", max_pain)
+        else:
+            max_pain = calc_max_pain(df_m, strikes, S)
+    else:
+        max_pain = calc_max_pain(df_m, strikes, S)
 
-    # PCR
-    pcr = calc_pcr(df_m, S)
+    # PCR（実OIがあれば使用）
+    if oi_data:
+        lower, upper = S * 0.70, S * 1.30
+        oi_f = {k: v for k, v in oi_data.items() if lower <= k <= upper}
+        if oi_f:
+            call_sum = sum(v["call_oi"] for v in oi_f.values())
+            put_sum  = sum(v["put_oi"]  for v in oi_f.values())
+            pcr = round(put_sum / call_sum, 3) if call_sum > 0 else None
+            log.info("PCR(実OI): %s (CALL=%.0f PUT=%.0f)", pcr, call_sum, put_sum)
+        else:
+            pcr = calc_pcr(df_m, S)
+    else:
+        pcr = calc_pcr(df_m, S)
 
     # GEX
     gex_df = calc_gex(df_m, S, T)
@@ -322,14 +348,29 @@ def main():
     all_months = df["ContractMonth"].dropna().unique().tolist()
     months = sorted([m for m in all_months if len(str(m).strip()) == 6])
     log.info("月次限月のみ処理: %s", months)
-    log.info("検出された限月: %s", months)
+
+    # OIデータ（fetch_oi.pyが生成）を読み込む
+    oi_path = DATA_DIR / "oi_latest.json"
+    oi_by_month = {}
+    if oi_path.exists():
+        try:
+            oi_json = json.loads(oi_path.read_text())
+            for month, data in oi_json.get("months", {}).items():
+                oi_by_month[month] = {
+                    float(k): v for k, v in data.get("oi_by_strike", {}).items()
+                }
+            log.info("OIデータ読込成功: %d限月", len(oi_by_month))
+        except Exception as e:
+            log.warning("OIデータ読込失敗: %s → 終値代用", e)
+    else:
+        log.info("oi_latest.json なし → 終値代用でMaxPain・PCR計算")
 
     # 限月別分析
     month_results = []
     for month_str in months:
         df_m = df[df["ContractMonth"] == month_str].copy()
         log.info("分析中: %s (%d行)", month_str, len(df_m))
-        result = analyze_month(df_m, S, month_str, today)
+        result = analyze_month(df_m, S, month_str, today, oi_data=oi_by_month.get(month_str))
         if result:
             month_results.append(result)
 
