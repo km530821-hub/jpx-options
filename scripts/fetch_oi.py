@@ -11,6 +11,7 @@ Excelシート構造（market_data_OP）:
 """
 
 import os
+import sys
 import io
 import json
 import logging
@@ -226,14 +227,14 @@ def main():
             break
 
     if not raw:
-        log.error("Excel取得失敗")
-        raise SystemExit(1)
+        log.warning("Excel取得失敗 → OIデータなしでスキップ（17時以降に再実行）")
+        sys.exit(0)
 
     wb = openpyxl.load_workbook(io.BytesIO(raw), data_only=True)
     ws = find_sheet(wb)
     if not ws:
-        log.error("シート解析失敗")
-        raise SystemExit(1)
+        log.warning("シート解析失敗 → スキップ")
+        sys.exit(0)
 
     oi_by_month = parse_oi_sheet(ws)
 
