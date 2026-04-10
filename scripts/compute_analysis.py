@@ -49,6 +49,54 @@ def bs_greeks(S, K, T, sigma, opt_type, r=0.005):
         "vega":  round(vega, 4),  "rho":   round(rho, 4),
     }
 
+
+# ── IV逆算（二分法）────────────────────────────────
+def _bs_price_only(S, K, T, sigma, r, opt_type):
+    """BS価格のみ計算（高速化）"""
+    if T <= 0 or sigma <= 0:
+        return max(S-K,0) if opt_type=="C" else max(K-S,0)
+    sq = math.sqrt(T)
+    d1 = (math.log(S/K)+(r+0.5*sigma**2)*T)/(sigma*sq)
+    d2 = d1-sigma*sq
+    if opt_type=="C":
+        return S*norm_cdf(d1)-K*math.exp(-r*T)*norm_cdf(d2)
+    return K*math.exp(-r*T)*norm_cdf(-d2)-S*norm_cdf(-d1)
+
+def _bisect_iv(S, K, T, market_price, opt_type, r, tol=0.01, max_iter=200):
+    """指定opt_typeでIVを二分法逆算。失敗時None。"""
+    intrinsic = max(S-K,0) if opt_type=="C" else max(K-S,0)
+    if market_price <= intrinsic + 0.001:
+        return None
+    lo, hi = 0.001, 20.0
+    for _ in range(max_iter):
+        mid = (lo+hi)/2
+        p = _bs_price_only(S,K,T,mid,r,opt_type)
+        if abs(p-market_price) < tol:
+            return mid if 0.005 < mid < 5.0 else None
+        if p < market_price: lo = mid
+        else: hi = mid
+    result = (lo+hi)/2
+    return result if 0.005 < result < 5.0 else None
+
+def implied_vol(S, K, T, market_price, opt_type="C", r=0.005):
+    """
+    TheoreticalPrice から IV を逆算する。
+    JPX CSV の列構造:
+      - CallClose       = コール終値
+      - TheoreticalPrice = プット理論価格  ← 注意！コールではない
+    そのため opt_type="P" で逆算するのが正しい。
+    コール・プット両方試して有効な方を返す。
+    """
+    if T <= 0 or market_price <= 0 or S <= 0 or K <= 0:
+        return None
+    # まず指定opt_typeで試す
+    iv = _bisect_iv(S, K, T, market_price, opt_type, r)
+    if iv is not None:
+        return iv
+    # 失敗したら逆のopt_typeで試す
+    other = "P" if opt_type == "C" else "C"
+    return _bisect_iv(S, K, T, market_price, other, r)
+
 # ── 満期日（第2金曜日）─────────────────────────────
 
 def expiry_date(contract_month_dt):
@@ -127,11 +175,17 @@ def calc_gex(df, S, T, r=0.005):
     gex_list = []
     for _, row in df.iterrows():
         K  = row["StrikePrice"]
-        iv = row["IV"]
-        if pd.isna(K) or pd.isna(iv) or iv <= 0.05:
+        tp = row.get("TheoreticalPrice")
+        if pd.isna(K) or pd.isna(tp) or float(tp) <= 0:
             continue
-        iv_dec = iv if iv < 1 else iv / 100
+        # TheoreticalPriceからIVを逆算（IV列は全行0.01のダミー）
+        # TheoreticalPrice = プット理論価格。プットIVとコールIVはput-call parityで等価
+        iv_dec = implied_vol(S, K, T, float(tp), "P", r)
+        if iv_dec is None:
+            continue
         oi = float(pd.to_numeric(row.get("CallClose"), errors="coerce") or 1)
+        if oi <= 0:
+            oi = 1.0
         g  = bs_greeks(S, K, T, iv_dec, "C", r)
         if g:
             gex_list.append({
@@ -172,16 +226,35 @@ def find_gamma_flip(gex_df, S):
 
 # ── ATM IV取得（有効値のみ）─────────────────────────
 
-def get_atm_iv(df, S):
+def get_atm_iv(df, S, T, r=0.005):
     """
-    ATM付近の有効なIV（0.05超）を取得。
-    先物に最も近い行使価格から順に探す。
+    ATM付近のIVを取得。
+    JPX CSVのIV列は全行0.01のダミー値のため、TheoreticalPriceからBS逆算する。
+    ATMに近い行使価格から順に試みて最初に有効なIVを返す。
     """
+    df_copy = df.copy()
+    df_copy["dist"] = (df_copy["StrikePrice"] - S).abs()
+    df_sorted = df_copy.sort_values("dist")
+
+    for _, row in df_sorted.iterrows():
+        K = row.get("StrikePrice")
+        tp = row.get("TheoreticalPrice")
+        if pd.isna(K) or pd.isna(tp) or float(tp) <= 0:
+            continue
+        # TheoreticalPrice = プット理論価格（横持ち形式の仕様）
+        iv = implied_vol(S, K, T, float(tp), "P", r)
+        if iv is not None:
+            log.info("IV逆算成功: K=%.0f TheoPrice=%.2f IV=%.4f (%.1f%%)", K, tp, iv, iv*100)
+            return iv
+
+    # フォールバック: 生IV列（0.01以外の値があれば使用）
     df_valid = df[(df["IV"].notna()) & (df["IV"] > 0.05)].copy()
-    if df_valid.empty:
-        return 0.35
-    df_valid["dist"] = (df_valid["StrikePrice"] - S).abs()
-    return float(df_valid.sort_values("dist").iloc[0]["IV"])
+    if not df_valid.empty:
+        df_valid["dist"] = (df_valid["StrikePrice"] - S).abs()
+        return float(df_valid.sort_values("dist").iloc[0]["IV"])
+
+    log.warning("IV取得失敗 → デフォルト35%%使用")
+    return 0.35
 
 # ── 1限月分の分析 ──────────────────────────────────
 
@@ -205,7 +278,7 @@ def analyze_month(df_m, S, month_str, today, oi_data=None):
     atm_diff   = round(atm_strike - S)
 
     # ATM IV
-    atm_iv_raw = get_atm_iv(df_m, S)
+    atm_iv_raw = get_atm_iv(df_m, S, T)
     atm_iv_dec = atm_iv_raw if atm_iv_raw < 1 else atm_iv_raw / 100
 
     # グリークス
@@ -287,9 +360,14 @@ def analyze_month(df_m, S, month_str, today, oi_data=None):
         if row.empty:
             continue
         r = row.iloc[0]
-        iv_v = float(r["IV"]) if not pd.isna(r["IV"]) else None
-        if iv_v and iv_v < 0.05:
-            iv_v = None  # 無効値除外
+        # IV列は全行0.01のダミー値のためTheoreticalPriceから逆算
+        tp_v = r.get("TheoreticalPrice")
+        if not pd.isna(tp_v) and float(tp_v) > 0:
+            # TheoreticalPrice = プット理論価格
+            iv_dec_v = implied_vol(S, k, T, float(tp_v), "P")
+            iv_v = round(iv_dec_v * 100, 2) if iv_dec_v else None
+        else:
+            iv_v = None
         strikes_summary.append({
             "strike":      k,
             "iv":          iv_v,
