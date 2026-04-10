@@ -1,9 +1,14 @@
 """
 fetch_jpx.py
 新URL・新列構造（2026年2月24日以降）対応版
-列: UnderlyingName, OptionType, ContractMonth, StrikePrice,
-    ?, SecurityCode, CallBid, CallAsk, CallClose, TheoreticalPrice,
-    PutSecurityCode, PutBid, PutAsk, UnderlyingClose, IV, BaseVolatility, Delta
+
+【列の実態】
+- UnderlyingClose: StrikePrice毎に変化する擬似値（= BaseVolatility - StrikePrice 付近）
+                   原資産終値ではないので使用禁止
+- BaseVolatility:  全行で共通の定数値 → これが本当の日経225現物終値
+                   例: 55895.32（全行同じ）
+
+正しい原資産価格: df["BaseVolatility"].dropna().iloc[0]
 """
 
 import os
@@ -34,9 +39,9 @@ COLUMNS = [
     "PutSecurityCode",
     "PutBid",
     "PutAsk",
-    "UnderlyingClose",   # 43031.01 → 原資産終値
-    "IV",                # 0.01 など
-    "BaseVolatility",    # 53373.07
+    "UnderlyingClose",   # ※擬似値（BaseVolatility - StrikePrice付近）原資産終値ではない
+    "IV",                # インプライドボラティリティ (小数: 0.35 = 35%)
+    "BaseVolatility",    # ★本当の日経225現物終値（全行で同一値 例: 55895.32）
     "Delta",             # 0.4007
 ]
 
@@ -115,7 +120,8 @@ def main():
     df.to_csv(DATA_DIR / "options_latest.csv", index=False, encoding="utf-8-sig")
     log.info("保存完了: options_%s.csv (%d行)", used_date, len(df))
 
-    underlying = df["UnderlyingClose"].dropna()
+    # BaseVolatility が本当の日経225現物終値（全行で共通値）
+    underlying = df["BaseVolatility"].dropna()
     meta = {
         "date": used_date,
         "rows": len(df),
