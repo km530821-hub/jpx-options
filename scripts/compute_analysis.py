@@ -110,38 +110,41 @@ def expiry_date(contract_month_dt):
 def calc_max_pain(df, strikes, S):
     """
     MaxPain = オプション売り手の損失が最小になる行使価格。
-    ATM ± 30% の行使価格のみを対象にして計算。
-    OI の代用として CallClose / TheoreticalPrice を使用。
-    コールはk_exp超で損失が発生、プットはk_exp未満で損失が発生。
+
+    【重要】OI（建玉残高）が取得できない場合の計算方針:
+    CallClose はコール終値であり、OIの代用には使えない。
+    （ITMコールほど終値が高くなりMaxPainが上方バイアスする）
+
+    代わりに各行使価格に OI=1 を仮定した「ストライク分布の重心」として計算する。
+    これはATM付近に最も多くのポジションが集中するという市場実態の近似。
+
+    実OI（fetch_oi.py）が取得できた場合はそちらが優先される。
     """
-    lower = S * 0.70
-    upper = S * 1.30
+    lower = S * 0.85
+    upper = S * 1.15
     target_strikes = [k for k in strikes if lower <= k <= upper]
     if not target_strikes:
-        target_strikes = strikes  # フォールバック
+        lower = S * 0.70
+        upper = S * 1.30
+        target_strikes = [k for k in strikes if lower <= k <= upper]
+    if not target_strikes:
+        target_strikes = strikes
 
-    # OI代用: CallClose（終値）を優先、なければTheoreticalPrice
-    def get_oi(row):
-        cc = pd.to_numeric(row.get("CallClose"), errors="coerce")
-        if not pd.isna(cc) and cc > 0:
-            return float(cc)
-        tp = pd.to_numeric(row.get("TheoreticalPrice"), errors="coerce")
-        return float(tp) if not pd.isna(tp) and tp > 0 else 1.0
-
+    # OI=1固定（実OIなし）でコール・プット各1枚ずつのpain計算
+    # コール: 満期時 k_exp > K なら売り手に損失(k_exp - K)
+    # プット: 満期時 k_exp < K なら売り手に損失(K - k_exp)
     pain = {}
     for k_exp in target_strikes:
         total = 0.0
-        for _, row in df.iterrows():
-            k   = row["StrikePrice"]
-            oi  = get_oi(row)
-            # コール：k_exp < k の場合、コールが行使され売り手に損失
-            total += oi * max(0.0, k - k_exp)
-            # プット：k_exp > k の場合、プットが行使され売り手に損失
-            total += oi * max(0.0, k_exp - k)
+        for k in strikes:
+            # コール1枚の損失
+            total += max(0.0, k_exp - k)   # k_exp > K → コール行使
+            # プット1枚の損失
+            total += max(0.0, k - k_exp)   # k_exp < K → プット行使
         pain[k_exp] = total
 
     mp = min(pain, key=pain.get) if pain else S
-    log.info("MaxPain計算: ATM=%.0f 対象行使価格数=%d 結果=%.0f", S, len(target_strikes), mp)
+    log.info("MaxPain計算(OI均等): ATM=%.0f 対象=%d 結果=%.0f", S, len(target_strikes), mp)
     return mp
 
 # ── PCR（Put/Call Ratio）─────────────────────────────
