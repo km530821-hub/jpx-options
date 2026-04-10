@@ -339,7 +339,14 @@ def main():
     df["ContractMonthDt"] = pd.to_datetime(df["ContractMonth"], format="%Y%m", errors="coerce")
 
     # 原資産価格（日経225現物終値）
-    S = float(df["UnderlyingClose"].dropna().iloc[0]) if not df["UnderlyingClose"].dropna().empty else 38000.0
+    # UnderlyingClose は行使価格連動の擬似値のため使用禁止
+    # BaseVolatility が全行共通の正しい現物終値
+    bv = df["BaseVolatility"].dropna() if "BaseVolatility" in df.columns else pd.Series(dtype=float)
+    if not bv.empty:
+        S = float(bv.iloc[0])
+    else:
+        meta_path = DATA_DIR / "meta.json"
+        S = json.loads(meta_path.read_text()).get("underlying_close", 38000.0) if meta_path.exists() else 38000.0
     log.info("原資産価格（日経225現物終値）: %.2f", S)
 
     today = date.today()
