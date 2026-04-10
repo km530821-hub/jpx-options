@@ -179,8 +179,12 @@ def calc_gex(df, S, T, r=0.005):
         if pd.isna(K) or pd.isna(tp) or float(tp) <= 0:
             continue
         # TheoreticalPriceからIVを逆算（IV列は全行0.01のダミー）
-        # TheoreticalPrice = プット理論価格。プットIVとコールIVはput-call parityで等価
-        iv_dec = implied_vol(S, K, T, float(tp), "P", r)
+        # CallClose = コール終値。K>SのOTMコールからIV逆算（最も信頼性高い）
+        cc = row.get("CallClose")
+        if pd.isna(cc) or float(cc) <= 0:
+            continue
+        opt_type = "C" if K > S else "P"  # OTM側で逆算
+        iv_dec = implied_vol(S, K, T, float(cc), opt_type, r)
         if iv_dec is None:
             continue
         oi = float(pd.to_numeric(row.get("CallClose"), errors="coerce") or 1)
@@ -229,31 +233,31 @@ def find_gamma_flip(gex_df, S):
 def get_atm_iv(df, S, T, r=0.005):
     """
     ATM付近のIVを取得。
-    JPX CSVのIV列は全行0.01のダミー値のため、TheoreticalPriceからBS逆算する。
-    ATMに近い行使価格から順に試みて最初に有効なIVを返す。
+    JPX CSV の IV列・TheoreticalPrice列は全行ダミー値のため使用不可。
+    CallClose列（コール終値）を使い、OTMコール（K > S）からIVを逆算する。
+    ATMに最も近いOTMコールから順に試みる。
     """
-    df_copy = df.copy()
-    df_copy["dist"] = (df_copy["StrikePrice"] - S).abs()
-    df_sorted = df_copy.sort_values("dist")
+    # OTMコール（K > S）のみを対象（K <= S はITMでIV逆算不安定）
+    df_otm = df[df["StrikePrice"] > S].copy()
+    if df_otm.empty:
+        log.warning("OTMコールが存在しない → デフォルト35%%使用")
+        return 0.35
 
-    for _, row in df_sorted.iterrows():
+    # ATMに近い順（K昇順 = 最もATMに近いOTMから）
+    df_otm = df_otm.sort_values("StrikePrice")
+
+    for _, row in df_otm.iterrows():
         K = row.get("StrikePrice")
-        tp = row.get("TheoreticalPrice")
-        if pd.isna(K) or pd.isna(tp) or float(tp) <= 0:
+        cc = row.get("CallClose")
+        if pd.isna(K) or pd.isna(cc) or float(cc) <= 0:
             continue
-        # TheoreticalPrice = プット理論価格（横持ち形式の仕様）
-        iv = implied_vol(S, K, T, float(tp), "P", r)
+        iv = implied_vol(S, K, T, float(cc), "C", r)
         if iv is not None:
-            log.info("IV逆算成功: K=%.0f TheoPrice=%.2f IV=%.4f (%.1f%%)", K, tp, iv, iv*100)
+            log.info("IV逆算成功(OTMコール): K=%.0f CallClose=%.2f IV=%.4f (%.1f%%)",
+                     K, cc, iv, iv*100)
             return iv
 
-    # フォールバック: 生IV列（0.01以外の値があれば使用）
-    df_valid = df[(df["IV"].notna()) & (df["IV"] > 0.05)].copy()
-    if not df_valid.empty:
-        df_valid["dist"] = (df_valid["StrikePrice"] - S).abs()
-        return float(df_valid.sort_values("dist").iloc[0]["IV"])
-
-    log.warning("IV取得失敗 → デフォルト35%%使用")
+    log.warning("IV逆算失敗 → デフォルト35%%使用")
     return 0.35
 
 # ── 1限月分の分析 ──────────────────────────────────
@@ -360,11 +364,12 @@ def analyze_month(df_m, S, month_str, today, oi_data=None):
         if row.empty:
             continue
         r = row.iloc[0]
-        # IV列は全行0.01のダミー値のためTheoreticalPriceから逆算
-        tp_v = r.get("TheoreticalPrice")
-        if not pd.isna(tp_v) and float(tp_v) > 0:
-            # TheoreticalPrice = プット理論価格
-            iv_dec_v = implied_vol(S, k, T, float(tp_v), "P")
+        # IV列・TheoreticalPrice列はダミー → CallCloseからIV逆算
+        cc_v = r.get("CallClose")
+        cc_v = float(cc_v) if not pd.isna(cc_v) else 0.0
+        if cc_v > 0:
+            opt_type_v = "C" if k > S else "P"
+            iv_dec_v = implied_vol(S, k, T, cc_v, opt_type_v)
             iv_v = round(iv_dec_v * 100, 2) if iv_dec_v else None
         else:
             iv_v = None
