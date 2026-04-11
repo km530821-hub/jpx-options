@@ -107,16 +107,15 @@ def expiry_date(contract_month_dt):
 
 # ── MaxPain（ATM±30%の行使価格のみ対象）──────────────
 
-def calc_max_pain(df, strikes, S):
+def calc_max_pain(df, strikes, S, T, r=0.005):
     """
     MaxPain = オプション売り手の損失が最小になる行使価格。
 
-    【重要】OI（建玉残高）が取得できない場合の計算方針:
-    CallClose はコール終値であり、OIの代用には使えない。
-    （ITMコールほど終値が高くなりMaxPainが上方バイアスする）
-
-    代わりに各行使価格に OI=1 を仮定した「ストライク分布の重心」として計算する。
-    これはATM付近に最も多くのポジションが集中するという市場実態の近似。
+    【OI代用方針】実OI（fetch_oi.py）がない場合:
+    BS理論価格をOI代用として使用する。
+    - K > S (OTMコール): コール理論価格 × 行使確率
+    - K < S (OTMプット): プット理論価格 × 行使確率
+    これにより ATM付近が自然に最大OIとなり、MaxPain≈ATMになる。
 
     実OI（fetch_oi.py）が取得できた場合はそちらが優先される。
     """
@@ -124,27 +123,43 @@ def calc_max_pain(df, strikes, S):
     upper = S * 1.15
     target_strikes = [k for k in strikes if lower <= k <= upper]
     if not target_strikes:
-        lower = S * 0.70
-        upper = S * 1.30
-        target_strikes = [k for k in strikes if lower <= k <= upper]
+        target_strikes = [k for k in strikes if S*0.70 <= k <= S*1.30]
     if not target_strikes:
         target_strikes = strikes
 
-    # OI=1固定（実OIなし）でコール・プット各1枚ずつのpain計算
-    # コール: 満期時 k_exp > K なら売り手に損失(k_exp - K)
-    # プット: 満期時 k_exp < K なら売り手に損失(K - k_exp)
+    # ATM IVを推定（簡易）
+    atm_strike = min(target_strikes, key=lambda k: abs(k-S))
+    sigma = 0.23  # デフォルトIV（後で実測IVに置き換え可能）
+
+    def bs_call_price(K, sig):
+        if T <= 0 or sig <= 0: return max(S-K, 0)
+        sq = math.sqrt(T)
+        d1 = (math.log(S/K) + (r + 0.5*sig**2)*T) / (sig*sq)
+        d2 = d1 - sig*sq
+        return S*norm_cdf(d1) - K*math.exp(-r*T)*norm_cdf(d2)
+
+    def bs_put_price(K, sig):
+        if T <= 0 or sig <= 0: return max(K-S, 0)
+        sq = math.sqrt(T)
+        d1 = (math.log(S/K) + (r + 0.5*sig**2)*T) / (sig*sq)
+        d2 = d1 - sig*sq
+        return K*math.exp(-r*T)*norm_cdf(-d2) - S*norm_cdf(-d1)
+
+    # BS理論価格をOI代用としてMaxPain計算
     pain = {}
     for k_exp in target_strikes:
         total = 0.0
-        for k in strikes:
-            # コール1枚の損失
-            total += max(0.0, k_exp - k)   # k_exp > K → コール行使
-            # プット1枚の損失
-            total += max(0.0, k - k_exp)   # k_exp < K → プット行使
+        for k in target_strikes:
+            if k >= S:
+                oi = bs_call_price(k, sigma)
+                total += oi * max(0.0, k_exp - k)
+            else:
+                oi = bs_put_price(k, sigma)
+                total += oi * max(0.0, k - k_exp)
         pain[k_exp] = total
 
-    mp = min(pain, key=pain.get) if pain else S
-    log.info("MaxPain計算(OI均等): ATM=%.0f 対象=%d 結果=%.0f", S, len(target_strikes), mp)
+    mp = min(pain, key=pain.get) if pain else atm_strike
+    log.info("MaxPain計算(BS代用): ATM=%.0f 対象=%d 結果=%.0f", S, len(target_strikes), mp)
     return mp
 
 # ── PCR（Put/Call Ratio）─────────────────────────────
@@ -175,30 +190,36 @@ def calc_pcr(df, S):
 # ── GEX・GammaFlip ──────────────────────────────────
 
 def calc_gex(df, S, T, r=0.005):
+    """
+    GEX計算。
+    OTMコール（K>S）: GEX = +Gamma × CallClose（OI代用）× S^2/100
+    OTMプット（K<S）: GEX = -Gamma × CallClose（OI代用）× S^2/100
+    → コールはディーラーがデルタヘッジでロングガンマ（安定化）
+    → プットはディーラーがショートガンマ（不安定化）
+    GEXが正→負に転じる行使価格がGammaFlip
+    """
     gex_list = []
     for _, row in df.iterrows():
         K  = row["StrikePrice"]
-        tp = row.get("TheoreticalPrice")
-        if pd.isna(K) or pd.isna(tp) or float(tp) <= 0:
-            continue
-        # TheoreticalPriceからIVを逆算（IV列は全行0.01のダミー）
-        # CallClose = コール終値。K>SのOTMコールからIV逆算（最も信頼性高い）
         cc = row.get("CallClose")
-        if pd.isna(cc) or float(cc) <= 0:
+        if pd.isna(K) or pd.isna(cc) or float(cc) <= 0:
             continue
-        opt_type = "C" if K > S else "P"  # OTM側で逆算
+        # IV逆算: OTMコール=コール、OTMプット=プット
+        opt_type = "C" if K >= S else "P"
         iv_dec = implied_vol(S, K, T, float(cc), opt_type, r)
         if iv_dec is None:
             continue
-        oi = float(pd.to_numeric(row.get("CallClose"), errors="coerce") or 1)
-        if oi <= 0:
-            oi = 1.0
-        g  = bs_greeks(S, K, T, iv_dec, "C", r)
-        if g:
-            gex_list.append({
-                "StrikePrice": K,
-                "GEX": round(g["gamma"] * oi * S * S / 100, 2)
-            })
+        g = bs_greeks(S, K, T, iv_dec, "C", r)
+        if not g:
+            continue
+        gamma = g["gamma"]
+        oi = float(cc)  # CallClose をOI代用
+        # コール(K>=S)は+GEX、プット(K<S)は-GEX
+        sign = 1.0 if K >= S else -1.0
+        gex_list.append({
+            "StrikePrice": K,
+            "GEX": round(sign * gamma * oi * S * S / 100, 2)
+        })
     if not gex_list:
         return pd.DataFrame(columns=["StrikePrice", "GEX"])
     return pd.DataFrame(gex_list).groupby("StrikePrice")["GEX"].sum().reset_index()
@@ -306,9 +327,9 @@ def analyze_month(df_m, S, month_str, today, oi_data=None):
             max_pain = min(pain, key=pain.get) if pain else S
             log.info("MaxPain(実OI): %.0f", max_pain)
         else:
-            max_pain = calc_max_pain(df_m, strikes, S)
+            max_pain = calc_max_pain(df_m, strikes, S, T)
     else:
-        max_pain = calc_max_pain(df_m, strikes, S)
+        max_pain = calc_max_pain(df_m, strikes, S, T)
 
     # PCR（実OIがあれば使用）
     if oi_data:
