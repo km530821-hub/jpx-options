@@ -24,6 +24,31 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:var(--font2);font-size:13px;min-height:100vh}
+
+/* ── 3限月比較パネル ── */
+.m3-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}
+@media(max-width:800px){.m3-grid{grid-template-columns:1fr}}
+.m3-col{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden;transition:border-color .15s}
+.m3-col.nearest{border-color:var(--amber);border-width:1.5px}
+.m3-col:hover{border-color:var(--border2)}
+.m3-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg3)}
+.m3-month{font-size:13px;font-weight:600;color:var(--text);font-family:var(--font)}
+.m3-dte{font-size:10px;color:var(--text3);font-family:var(--font)}
+.m3-badge{font-size:9px;padding:2px 6px;border-radius:3px;background:var(--amber-dim);color:var(--amber);border:1px solid #92400e;font-family:var(--font)}
+.m3-s{padding:8px 12px 6px;border-bottom:1px solid var(--border)}
+.m3-sval{font-size:20px;font-weight:600;color:var(--blue);font-family:var(--font);letter-spacing:-0.5px}
+.m3-ssub{font-size:10px;color:var(--text3);margin-top:2px}
+.m3-sect{padding:3px 12px 1px;font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.15)}
+.m3-row{display:flex;justify-content:space-between;align-items:center;padding:5px 12px;border-bottom:1px solid var(--border)}
+.m3-row:last-child{border-bottom:none}
+.m3-rl{font-size:10px;color:var(--text3);font-family:var(--font)}
+.m3-rv{font-size:12px;font-weight:500;color:var(--text);font-family:var(--font);text-align:right}
+.m3-rv.up{color:var(--green)}.m3-rv.dn{color:var(--red)}.m3-rv.am{color:var(--amber)}.m3-rv.pp{color:var(--purple)}
+.m3-rpair{display:flex;flex-direction:column;align-items:flex-end}
+.m3-rsub{font-size:9px;color:var(--text3);font-family:var(--font)}
+.m3-gbar-wrap{flex:1;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;margin:0 8px}
+.m3-gbar{height:100%;border-radius:2px}
+.m3-rowbar{display:flex;align-items:center;padding:5px 12px;border-bottom:1px solid var(--border)}
 .layout{display:flex;height:100vh;overflow:hidden}
 .sidebar{width:196px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 0}
 .logo{padding:0 16px 14px;border-bottom:1px solid var(--border);margin-bottom:10px}
@@ -208,24 +233,40 @@ tr:hover td{background:var(--bg3)}
 
 <!-- ── 市場統計 ── -->
 <div class="sec active" id="sec-dashboard">
-  <!-- 限月セレクタ -->
-  <div class="month-tabs" id="dash-month-tabs"></div>
+  <!-- 限月サマリーテーブル -->
+  <div class="card" style="margin-bottom:14px;padding:0;overflow:hidden">
+    <table id="m3-table" style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead>
+        <tr style="background:var(--bg3)">
+          <th style="padding:7px 12px;text-align:left;color:var(--text3);font-weight:500;font-family:var(--font);font-size:10px;border-bottom:1px solid var(--border);letter-spacing:.3px">限月</th>
+          <th style="padding:7px 10px;text-align:right;color:var(--text3);font-weight:500;font-family:var(--font);font-size:10px;border-bottom:1px solid var(--border);letter-spacing:.3px">残存日数</th>
+          <th style="padding:7px 10px;text-align:right;color:var(--text3);font-weight:500;font-family:var(--font);font-size:10px;border-bottom:1px solid var(--border);letter-spacing:.3px">先物価格</th>
+          <th style="padding:7px 10px;text-align:right;color:var(--text3);font-weight:500;font-family:var(--font);font-size:10px;border-bottom:1px solid var(--border);background:rgba(59,130,246,.06);letter-spacing:.3px">ATM（先物最近傍）</th>
+          <th style="padding:7px 10px;text-align:right;color:var(--text3);font-weight:500;font-family:var(--font);font-size:10px;border-bottom:1px solid var(--border);letter-spacing:.3px">MAX Pain</th>
+          <th style="padding:7px 10px;text-align:right;color:var(--text3);font-weight:500;font-family:var(--font);font-size:10px;border-bottom:1px solid var(--border);letter-spacing:.3px">ATM－先物</th>
+          <th style="padding:7px 10px;text-align:right;color:var(--text3);font-weight:500;font-family:var(--font);font-size:10px;border-bottom:1px solid var(--border);letter-spacing:.3px">MAX Pain－先物</th>
+          <th style="padding:7px 10px;text-align:right;color:var(--text3);font-weight:500;font-family:var(--font);font-size:10px;border-bottom:1px solid var(--border);letter-spacing:.3px">GammaFlip</th>
+          <th style="padding:7px 10px;text-align:right;color:var(--text3);font-weight:500;font-family:var(--font);font-size:10px;border-bottom:1px solid var(--border);letter-spacing:.3px">ATM IV</th>
+          <th style="padding:7px 10px;text-align:right;color:var(--text3);font-weight:500;font-family:var(--font);font-size:10px;border-bottom:1px solid var(--border);letter-spacing:.3px">PCR</th>
+          <th style="padding:7px 10px;text-align:center;color:var(--text3);font-weight:500;font-family:var(--font);font-size:10px;border-bottom:1px solid var(--border);letter-spacing:.3px">データ種別</th>
+        </tr>
+      </thead>
+      <tbody id="m3-tbody">
+        <tr><td colspan="11" style="padding:16px;text-align:center;color:var(--text3);font-family:var(--font);font-size:11px">データを読み込んでください</td></tr>
+      </tbody>
+    </table>
+    <div style="padding:6px 14px 8px;font-size:10px;color:var(--text3);font-family:var(--font);border-top:1px solid var(--border)">
+      * MAX Pain は毎営業日 19:00 JST に自動取得される建玉データから計算　/　GammaFlip はコール終値OI代用による推定値
+    </div>
+  </div>
 
-  <div class="grid4">
-    <div class="kpi"><div class="kpi-label">原資産（日経225）</div><div class="kpi-value kpi-bl" id="d-s">-</div><div class="kpi-sub" id="d-month">-</div></div>
-    <div class="kpi"><div class="kpi-label">MaxPain</div><div class="kpi-value kpi-am" id="d-mp">-</div><div class="kpi-sub" id="d-mpdiff">-</div></div>
-    <div class="kpi"><div class="kpi-label">GammaFlip</div><div class="kpi-value kpi-bl" id="d-gf">-</div><div class="kpi-sub" id="d-gfzone">-</div></div>
-    <div class="kpi"><div class="kpi-label">ATM IV / PCR</div><div class="kpi-value" id="d-iv">-</div><div class="kpi-sub" id="d-pcr">-</div></div>
-  </div>
-  <div class="grid4">
-    <div class="kpi"><div class="kpi-label">DTE（残存）</div><div class="kpi-value" id="d-dte">-</div><div class="kpi-sub" id="d-expiry">-</div></div>
-    <div class="kpi"><div class="kpi-label">Implied Move</div><div class="kpi-value" id="d-im">-</div><div class="kpi-sub" id="d-imrng">-</div></div>
-    <div class="kpi"><div class="kpi-label">Call IV / Put IV</div><div class="kpi-value" id="d-calliv">-</div><div class="kpi-sub" id="d-rr">-</div></div>
-    <div class="kpi"><div class="kpi-label">Call Wall / Put Wall</div><div class="kpi-value kpi-up" id="d-cw">-</div><div class="kpi-sub kpi-dn" id="d-pw">-</div></div>
-  </div>
+  <!-- 既存: 限月セレクタ（他タブ用に残す） -->
+  <div class="month-tabs" id="dash-month-tabs" style="display:none"></div>
+
+  <!-- 選択中限月グリークス -->
   <div class="grid2">
     <div class="card">
-      <div class="card-title">ATM コール グリークス</div>
+      <div class="card-title">ATM コール グリークス <span id="d-month" style="color:var(--text3);font-weight:400"></span></div>
       <div id="call-g"></div>
     </div>
     <div class="card">
@@ -234,8 +275,17 @@ tr:hover td{background:var(--bg3)}
     </div>
   </div>
   <div class="card">
-    <div class="card-title">価格マップ</div>
+    <div class="card-title">価格マップ（直近限月）</div>
     <div id="pricemap"></div>
+  </div>
+
+  <!-- 既存KPI（非表示、JS互換性のため残す） -->
+  <div style="display:none">
+    <span id="d-s"></span><span id="d-mp"></span><span id="d-mpdiff"></span>
+    <span id="d-gf"></span><span id="d-gfzone"></span><span id="d-iv"></span>
+    <span id="d-pcr"></span><span id="d-dte"></span><span id="d-expiry"></span>
+    <span id="d-im"></span><span id="d-imrng"></span><span id="d-calliv"></span>
+    <span id="d-rr"></span><span id="d-cw"></span><span id="d-pw"></span>
   </div>
 </div>
 
@@ -606,9 +656,137 @@ function selectMonth(idx){
 }
 
 // ── ダッシュボード ──
+function build3MonthCol(m, S, isNearest){
+  const mp=m.max_pain, gf=m.gamma_flip;
+  const iv=m.atm_iv_pct, pcr=m.pcr;
+  const cw=m.call_wall, pw=m.put_wall;
+  const gex=m.total_gex_m;
+  const im=m.im;
+  const mpDiff=mp!=null?mp-S:null;
+  const gexPos=(gex||0)>=0;
+  const pcrStr=pcr!=null?pcr.toFixed(3)+' '+(pcr<0.7?'強気':pcr>1.3?'弱気':'中立'):'-';
+  const d=document.createElement('div');
+  d.className='m3-col'+(isNearest?' nearest':'');
+  d.innerHTML=`
+    <div class="m3-head">
+      <span class="m3-month">${(m.month||'').slice(0,4)+'/'+(m.month||'').slice(4)} 限</span>
+      <div style="display:flex;align-items:center;gap:5px">
+        ${isNearest?'<span class="m3-badge">直近</span>':''}
+        <span class="m3-dte">DTE ${m.dte}日</span>
+      </div>
+    </div>
+    <div class="m3-s">
+      <div class="m3-sval">${fmt(S)}</div>
+      <div class="m3-ssub">日経225　満期 ${m.expiry_date||'-'}</div>
+    </div>
+    <div class="m3-sect">価格レベル</div>
+    <div class="m3-row">
+      <span class="m3-rl">MaxPain</span>
+      <div class="m3-rpair">
+        <span class="m3-rv am">${fmt(mp)}</span>
+        <span class="m3-rsub">${mpDiff!=null?fmtS(mpDiff)+'円':''}</span>
+      </div>
+    </div>
+    <div class="m3-row">
+      <span class="m3-rl">GammaFlip</span>
+      <div class="m3-rpair">
+        <span class="m3-rv pp">${gf?fmt(gf):'なし'}</span>
+        <span class="m3-rsub">${gf&&S>gf?'GEX+ 安定':gf&&S<=gf?'GEX- 不安定':''}</span>
+      </div>
+    </div>
+    <div class="m3-row">
+      <span class="m3-rl">Call Wall</span>
+      <span class="m3-rv up">${cw?fmt(cw):'-'}</span>
+    </div>
+    <div class="m3-row">
+      <span class="m3-rl">Put Wall</span>
+      <span class="m3-rv dn">${pw?fmt(pw):'-'}</span>
+    </div>
+    <div class="m3-sect">ボラティリティ</div>
+    <div class="m3-row">
+      <span class="m3-rl">ATM IV</span>
+      <div class="m3-rpair">
+        <span class="m3-rv">${pct(iv)}</span>
+        <span class="m3-rsub">PCR ${pcrStr}</span>
+      </div>
+    </div>
+    <div class="m3-row">
+      <span class="m3-rl">Call IV / Put IV</span>
+      <div class="m3-rpair">
+        <span class="m3-rv">${pct(m.call_iv)} / ${pct(m.put_iv)}</span>
+        <span class="m3-rsub">RR ${fmtS(m.rr||0,2)}%</span>
+      </div>
+    </div>
+    <div class="m3-sect">GEX / Implied Move</div>
+    <div class="m3-rowbar">
+      <span class="m3-rl" style="flex-shrink:0;width:40px">GEX</span>
+      <div class="m3-gbar-wrap"><div class="m3-gbar" style="width:${Math.min(Math.abs(gex||0)/5*100,100).toFixed(0)}%;background:${gexPos?'var(--green)':'var(--red)'}"></div></div>
+      <span class="m3-rv ${gexPos?'up':'dn'}" style="font-size:11px;flex-shrink:0">${gex!=null?(gexPos?'+':'')+gex.toFixed(1)+'M':'-'}</span>
+    </div>
+    <div class="m3-row">
+      <span class="m3-rl">Implied Move</span>
+      <div class="m3-rpair">
+        <span class="m3-rv">${im?'±'+fmt(im):'-'}</span>
+        <span class="m3-rsub">${m.im_pct!=null?'±'+m.im_pct.toFixed(1)+'%':''}　${m.im_upper?fmt(m.im_upper)+'↑':''} ${m.im_lower?fmt(m.im_lower)+'↓':''}</span>
+      </div>
+    </div>`;
+  return d;
+}
+
+function render3MonthPanel(){
+  if(!D||!D.months) return;
+  const S=D.underlying.close;
+  const nearest=D.nearest_month;
+  const tbody=document.getElementById('m3-tbody');
+  if(!tbody) return;
+
+  // 表示する限月: 直近3つ（oi_latest.jsonがあれば「建玉」、なければ「理論価格」）
+  const rows=D.months.slice(0,3).map(m=>{
+    const isNearest=m.month===nearest;
+    const atm=m.atm_strike;
+    const mp=m.max_pain;
+    const gf=m.gamma_flip;
+    const atmDiff=atm!=null?atm-S:null;
+    const mpDiff=mp!=null?mp-S:null;
+    const label=(m.month||'').slice(0,4)+'年'+(m.month||'').slice(4)+'月限';
+    const iv=m.atm_iv_pct;
+    const pcr=m.pcr;
+    const hasMp=mp!=null&&mp>0&&Math.abs(mpDiff)< S*0.5;
+
+    // MAX Pain セル（複数候補があれば [候補] 表示）
+    const mpText=hasMp?fmt(mp):'建玉待ち';
+
+    const bg=isNearest?'rgba(245,158,11,.06)':'';
+    const border=isNearest?'border-left:2px solid var(--amber)':'border-left:2px solid transparent';
+
+    return `<tr style="background:${bg};${border}" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='${bg}'">
+      <td style="padding:6px 12px;font-family:var(--font);font-weight:${isNearest?600:400};color:${isNearest?'var(--amber)':'var(--text2)'};border-bottom:1px solid var(--border);white-space:nowrap">
+        ${label}${isNearest?' ★':''}
+      </td>
+      <td style="padding:6px 10px;text-align:right;font-family:var(--font);color:var(--text);border-bottom:1px solid var(--border)">${m.dte}日</td>
+      <td style="padding:6px 10px;text-align:right;font-family:var(--font);color:var(--blue);border-bottom:1px solid var(--border)">${fmt(S)}</td>
+      <td style="padding:6px 10px;text-align:right;font-family:var(--font);color:var(--blue);border-bottom:1px solid var(--border);background:rgba(59,130,246,.04)">${fmt(atm)}</td>
+      <td style="padding:6px 10px;text-align:right;font-family:var(--font);color:${hasMp?'var(--amber)':'var(--text3)'};border-bottom:1px solid var(--border)">${hasMp?fmt(mp):'<span style="font-size:9px">OI取得後</span>'}</td>
+      <td style="padding:6px 10px;text-align:right;font-family:var(--font);color:${(atmDiff||0)>=0?'var(--green)':'var(--red)'};border-bottom:1px solid var(--border)">${atmDiff!=null?fmtS(atmDiff):'-'}</td>
+      <td style="padding:6px 10px;text-align:right;font-family:var(--font);color:${hasMp&&mpDiff!=null?(mpDiff>=0?'var(--green)':'var(--red)'):'var(--text3)'};border-bottom:1px solid var(--border)">${hasMp&&mpDiff!=null?fmtS(mpDiff):'<span style="font-size:9px">OI取得後</span>'}</td>
+      <td style="padding:6px 10px;text-align:right;font-family:var(--font);color:${gf?'var(--purple)':'var(--text3)'};border-bottom:1px solid var(--border)">${gf?fmt(gf):'<span style="font-size:9px">算出不可</span>'}</td>
+      <td style="padding:6px 10px;text-align:right;font-family:var(--font);color:var(--text);border-bottom:1px solid var(--border)">${iv?iv.toFixed(1)+'%':'-'}</td>
+      <td style="padding:6px 10px;text-align:right;font-family:var(--font);color:var(--text);border-bottom:1px solid var(--border)">${pcr?pcr.toFixed(3):'-'}</td>
+      <td style="padding:6px 10px;text-align:center;border-bottom:1px solid var(--border)">
+        <span style="font-size:9px;padding:2px 7px;border-radius:3px;font-family:var(--font);background:var(--bg3);color:var(--text3);border:1px solid var(--border)">
+          ${D.oi_available?'建玉':'理論価格'}
+        </span>
+      </td>
+    </tr>`;
+  });
+
+  tbody.innerHTML=rows.join('');
+}
+
 function renderDashboard(){
   if(!D) return;
   buildMonthTabs('dash-month-tabs');
+  render3MonthPanel();
   const M = curMonth();
   const S = D.underlying.close;
   const mp=M.max_pain, gf=M.gamma_flip, iv=M.atm_iv_pct, dte=M.dte;
@@ -1019,6 +1197,8 @@ function loadPaste(){
 
 function applyData(){
   if(!D) return;
+  // OIデータの有無をフラグ化（analysis_latest.json に oi_available フィールドがあれば使用）
+  D.oi_available = D.oi_available || false;
   renderDashboard();
 }
 
