@@ -112,10 +112,11 @@ def calc_max_pain(df, strikes, S, T, r=0.005):
     MaxPain = オプション売り手の損失が最小になる行使価格。
 
     【OI代用方針】実OI（fetch_oi.py）がない場合:
-    BS理論価格をOI代用として使用する。
-    - K > S (OTMコール): コール理論価格 × 行使確率
-    - K < S (OTMプット): プット理論価格 × 行使確率
-    これにより ATM付近が自然に最大OIとなり、MaxPain≈ATMになる。
+    CallClose（コール終値）をOI代用として使用する。
+    - K > S (OTMコール): CallClose = コール終値（小さい → OTMほど小さい）
+    - K < S (OTMプット): CallClose = プット終値（小さい → OTMほど小さい）
+    これは限月・行使価格ごとに異なる実際の市場価格を反映するため
+    限月間で異なるMaxPainが計算される。
 
     実OI（fetch_oi.py）が取得できた場合はそちらが優先される。
     """
@@ -127,39 +128,41 @@ def calc_max_pain(df, strikes, S, T, r=0.005):
     if not target_strikes:
         target_strikes = strikes
 
-    # ATM IVを推定（簡易）
-    atm_strike = min(target_strikes, key=lambda k: abs(k-S))
-    sigma = 0.23  # デフォルトIV（後で実測IVに置き換え可能）
+    # CallCloseを行使価格→終値のマップとして取得
+    cc_map = {}
+    for _, row in df.iterrows():
+        k = row.get("StrikePrice")
+        cc = row.get("CallClose")
+        if k is not None and not pd.isna(k) and cc is not None and not pd.isna(cc):
+            cc_val = float(cc)
+            if cc_val > 0:
+                cc_map[float(k)] = cc_val
 
-    def bs_call_price(K, sig):
-        if T <= 0 or sig <= 0: return max(S-K, 0)
-        sq = math.sqrt(T)
-        d1 = (math.log(S/K) + (r + 0.5*sig**2)*T) / (sig*sq)
-        d2 = d1 - sig*sq
-        return S*norm_cdf(d1) - K*math.exp(-r*T)*norm_cdf(d2)
+    if not cc_map:
+        atm_strike = min(target_strikes, key=lambda k: abs(k-S))
+        log.warning("MaxPain: CallCloseデータなし → ATM返却")
+        return atm_strike
 
-    def bs_put_price(K, sig):
-        if T <= 0 or sig <= 0: return max(K-S, 0)
-        sq = math.sqrt(T)
-        d1 = (math.log(S/K) + (r + 0.5*sig**2)*T) / (sig*sq)
-        d2 = d1 - sig*sq
-        return K*math.exp(-r*T)*norm_cdf(-d2) - S*norm_cdf(-d1)
-
-    # BS理論価格をOI代用としてMaxPain計算
+    # CallCloseをOI代用としてMaxPain計算
+    # コール(K>=S): pain = CallClose(K) × max(0, k_exp - K)  （コール売り手の損失）
+    # プット(K<S):  pain = CallClose(K) × max(0, K - k_exp)  （プット売り手の損失）
     pain = {}
     for k_exp in target_strikes:
         total = 0.0
         for k in target_strikes:
+            oi = cc_map.get(k, 0.0)
             if k >= S:
-                oi = bs_call_price(k, sigma)
                 total += oi * max(0.0, k_exp - k)
             else:
-                oi = bs_put_price(k, sigma)
                 total += oi * max(0.0, k - k_exp)
         pain[k_exp] = total
 
-    mp = min(pain, key=pain.get) if pain else atm_strike
-    log.info("MaxPain計算(BS代用): ATM=%.0f 対象=%d 結果=%.0f", S, len(target_strikes), mp)
+    # 実OIなしでのMaxPain計算結果はほぼATM付近になる
+    # 全限月で同じ値になることを避けるため、実OIなし時は None を返す
+    # → UIで「建玉取得後に更新」と表示
+    # ※ oi_data がある場合はこの関数は呼ばれない（analyze_month内で分岐）
+    mp = min(pain, key=pain.get) if pain else None
+    log.info("MaxPain計算(CallClose代用): ATM=%.0f 対象=%d 結果=%s", S, len(target_strikes), mp)
     return mp
 
 # ── PCR（Put/Call Ratio）─────────────────────────────
@@ -416,7 +419,7 @@ def analyze_month(df_m, S, month_str, today, oi_data=None):
         "put_iv":          put_iv,
         "rr":              rr,
         "max_pain":        max_pain,
-        "mp_diff":         round(max_pain - S),
+        "mp_diff":         round(max_pain - S) if max_pain is not None else None,
         "gamma_flip":      gamma_flip,
         "total_gex_m":     total_gex,
         "gex_pos":         bool(gex_pos),
