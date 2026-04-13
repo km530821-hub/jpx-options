@@ -263,29 +263,20 @@ tr:hover td{background:var(--bg3)}
   <!-- 既存: 限月セレクタ（他タブ用に残す） -->
   <div class="month-tabs" id="dash-month-tabs" style="display:none"></div>
 
-  <!-- 選択中限月グリークス -->
-  <div class="grid2">
-    <div class="card">
-      <div class="card-title">ATM コール グリークス <span id="d-month" style="color:var(--text3);font-weight:400"></span></div>
-      <div id="call-g"></div>
-    </div>
-    <div class="card">
-      <div class="card-title">ATM プット グリークス</div>
-      <div id="put-g"></div>
-    </div>
-  </div>
-  <div class="card">
-    <div class="card-title">価格マップ（直近限月）</div>
-    <div id="pricemap"></div>
-  </div>
-
-  <!-- 既存KPI（非表示、JS互換性のため残す） -->
+  <!-- JS互換性のため非表示で残す -->
   <div style="display:none">
     <span id="d-s"></span><span id="d-mp"></span><span id="d-mpdiff"></span>
     <span id="d-gf"></span><span id="d-gfzone"></span><span id="d-iv"></span>
     <span id="d-pcr"></span><span id="d-dte"></span><span id="d-expiry"></span>
     <span id="d-im"></span><span id="d-imrng"></span><span id="d-calliv"></span>
     <span id="d-rr"></span><span id="d-cw"></span><span id="d-pw"></span>
+    <span id="d-month"></span><div id="call-g"></div><div id="put-g"></div>
+  </div>
+
+  <!-- 価格マップ -->
+  <div class="card">
+    <div class="card-title">価格マップ（直近限月）</div>
+    <div id="pricemap"></div>
   </div>
 </div>
 
@@ -384,13 +375,22 @@ tr:hover td{background:var(--bg3)}
 
 <!-- ── GEX分析 ── -->
 <div class="sec" id="sec-gex">
+
+  <!-- 直近3限月 KPIグリッド -->
+  <div id="gex-3month-grid" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px"></div>
+
+  <!-- 限月セレクタ（チャート用） -->
   <div class="month-tabs" id="gex-month-tabs"></div>
-  <div class="grid3" id="gex-cards"></div>
+
+  <!-- KPIカード -->
+  <div class="grid4" id="gex-cards" style="margin-bottom:14px"></div>
+
+  <!-- GEXチャート -->
   <div class="card">
-    <div class="card-title">行使価格別 GEX（ATM±25%）</div>
-    <div class="chart-wrap" style="height:280px"><canvas id="gexChart" role="img" aria-label="行使価格別GEXバーチャート"></canvas></div>
+    <div class="card-title" id="gex-chart-title">行使価格別 GEX（ATM±25%）</div>
+    <div class="chart-wrap" style="height:300px"><canvas id="gexChart" role="img" aria-label="行使価格別GEXバーチャート"></canvas></div>
   </div>
-  <div class="info">GEX+（正）→ ディーラーがロングガンマ、価格変動を抑制する安定化ゾーン。GEX-（負）→ ショートガンマ、トレンドが加速しやすい不安定化ゾーン。GEXが最大の行使価格がCall Wall（上値抵抗）として機能しやすい。</div>
+  <div class="info">GEX+（正）→ ディーラーがロングガンマ、価格変動を抑制する安定化ゾーン。GEX-（負）→ ショートガンマ、トレンドが加速しやすい不安定化ゾーン。GEX最大=Call Wall（上値抵抗）、GEX最小=Put Wall（下値支持）。</div>
 </div>
 
 <!-- ── IV・スマイル ── -->
@@ -919,23 +919,86 @@ function renderMonths(){
 function renderGEX(){
   if(!D) return;
   buildMonthTabs('gex-month-tabs');
-  const M=curMonth();
   const S=D.underlying.close;
-  const gexData=(M.gex_by_strike||[]).filter(r=>r.StrikePrice>=S*0.75&&r.StrikePrice<=S*1.25);
-  const totalGEX=(M.gex_by_strike||[]).reduce((s,r)=>s+r.GEX,0);
-  const maxGR=gexData.filter(r=>r.GEX>0).reduce((a,b)=>b.GEX>a.GEX?b:a,{StrikePrice:0,GEX:0});
+  const nearest=D.nearest_month;
+
+  // ── 直近3限月 KPIグリッド ──
+  const top3=D.months?D.months.slice(0,3):[];
+  const grid3=document.getElementById('gex-3month-grid');
+  if(grid3){
+    grid3.innerHTML=top3.map(m=>{
+      const gexData=m.gex_by_strike||[];
+      const totalGEX=gexData.reduce((s,r)=>s+r.GEX,0);
+      const posData=gexData.filter(r=>r.GEX>0);
+      const negData=gexData.filter(r=>r.GEX<0);
+      const maxGR=posData.length?posData.reduce((a,b)=>b.GEX>a.GEX?b:a,posData[0]):{StrikePrice:null,GEX:0};
+      const minGR=negData.length?negData.reduce((a,b)=>b.GEX<a.GEX?b:a,negData[0]):{StrikePrice:null,GEX:0};
+      const gf=m.gamma_flip;
+      const gexPos=totalGEX>=0;
+      const isNearest=m.month===nearest;
+      const mlabel=(m.month||'').slice(0,4)+'/'+(m.month||'').slice(4);
+      return `<div class="card" style="padding:12px 14px;${isNearest?'border-color:var(--amber)':''}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:11px;font-weight:600;color:${isNearest?'var(--amber)':'var(--text2)'};font-family:var(--font)">${mlabel}限${isNearest?' ★':''}</span>
+          <span style="font-size:10px;color:var(--text3);font-family:var(--font)">DTE ${m.dte}日</span>
+        </div>
+        <div style="font-size:18px;font-weight:600;color:${gexPos?'var(--green)':'var(--red)'};font-family:var(--font);letter-spacing:-0.5px;margin-bottom:2px">${gexPos?'+':''}${(totalGEX/1000000).toFixed(2)}M</div>
+        <div style="font-size:10px;color:${gexPos?'var(--green)':'var(--red)'};margin-bottom:10px">${gexPos?'GEX+ 安定化':'GEX- 不安定化'}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+          <div>
+            <div style="font-size:9px;color:var(--text3);font-family:var(--font);margin-bottom:2px">CALL WALL</div>
+            <div style="font-size:12px;font-weight:500;color:var(--green);font-family:var(--font)">${maxGR.StrikePrice?fmt(maxGR.StrikePrice):'-'}</div>
+            <div style="font-size:9px;color:var(--text3);font-family:var(--font)">${maxGR.GEX?(maxGR.GEX/1000).toFixed(0)+'K':''}</div>
+          </div>
+          <div>
+            <div style="font-size:9px;color:var(--text3);font-family:var(--font);margin-bottom:2px">PUT WALL</div>
+            <div style="font-size:12px;font-weight:500;color:var(--red);font-family:var(--font)">${minGR.StrikePrice?fmt(minGR.StrikePrice):'-'}</div>
+            <div style="font-size:9px;color:var(--text3);font-family:var(--font)">${minGR.GEX?(minGR.GEX/1000).toFixed(0)+'K':''}</div>
+          </div>
+          <div>
+            <div style="font-size:9px;color:var(--text3);font-family:var(--font);margin-bottom:2px">GAMMA FLIP</div>
+            <div style="font-size:12px;font-weight:500;color:var(--purple);font-family:var(--font)">${gf?fmt(gf):'-'}</div>
+            <div style="font-size:9px;color:var(--text3);font-family:var(--font)">GEX正負転換</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── 選択限月のGEXチャート ──
+  const M=curMonth();
+  const gexAll=M.gex_by_strike||[];
+  const gexData=gexAll.filter(r=>r.StrikePrice>=S*0.75&&r.StrikePrice<=S*1.25);
+  const totalGEX=gexAll.reduce((s,r)=>s+r.GEX,0);
+  const posData=gexData.filter(r=>r.GEX>0);
+  const negData=gexData.filter(r=>r.GEX<0);
+  const maxGR=posData.length?posData.reduce((a,b)=>b.GEX>a.GEX?b:a,posData[0]):{StrikePrice:null,GEX:0};
+  const minGR=negData.length?negData.reduce((a,b)=>b.GEX<a.GEX?b:a,negData[0]):{StrikePrice:null,GEX:0};
   const gf=M.gamma_flip;
   const gexPos=totalGEX>=0;
+  const mlabel=(M.month||'').slice(0,4)+'/'+(M.month||'').slice(4);
+
+  document.getElementById('gex-chart-title').textContent=`行使価格別 GEX（${mlabel}限　ATM±25%）`;
+
   document.getElementById('gex-cards').innerHTML=`
     <div class="kpi"><div class="kpi-label">Total GEX</div><div class="kpi-value" style="color:${gexPos?'var(--green)':'var(--red)'}">${gexPos?'+':''}${(totalGEX/1000000).toFixed(2)}M</div><div class="kpi-sub">${gexPos?'GEX+ 安定化':'GEX- 不安定化'}</div></div>
-    <div class="kpi"><div class="kpi-label">Call Wall（GEX最大）</div><div class="kpi-value kpi-up">${fmt(maxGR.StrikePrice)}</div><div class="kpi-sub">GEX: ${(maxGR.GEX/1000).toFixed(0)}K</div></div>
-    <div class="kpi"><div class="kpi-label">GammaFlip</div><div class="kpi-value kpi-pp">${gf?fmt(gf):'なし'}</div><div class="kpi-sub">GEX正負転換点</div></div>`;
+    <div class="kpi"><div class="kpi-label">Call Wall（GEX+最大）</div><div class="kpi-value kpi-up">${maxGR.StrikePrice?fmt(maxGR.StrikePrice):'-'}</div><div class="kpi-sub">${maxGR.GEX?(maxGR.GEX/1000).toFixed(0)+'K':''}</div></div>
+    <div class="kpi"><div class="kpi-label">Put Wall（GEX-最大）</div><div class="kpi-value kpi-dn">${minGR.StrikePrice?fmt(minGR.StrikePrice):'-'}</div><div class="kpi-sub">${minGR.GEX?(minGR.GEX/1000).toFixed(0)+'K':''}</div></div>
+    <div class="kpi"><div class="kpi-label">GammaFlip</div><div class="kpi-value kpi-pp">${gf?fmt(gf):'-'}</div><div class="kpi-sub">GEX正負転換点</div></div>`;
+
   if(gexChart) gexChart.destroy();
   const colors=gexData.map(r=>r.GEX>=0?'rgba(34,197,94,0.65)':'rgba(239,68,68,0.65)');
   gexChart=new Chart(document.getElementById('gexChart'),{
     type:'bar',
     data:{labels:gexData.map(r=>fmt(r.StrikePrice)),datasets:[{data:gexData.map(r=>r.GEX),backgroundColor:colors,borderWidth:0,borderRadius:2}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},annotation:{annotations:{line1:{type:'line',xMin:S,xMax:S,borderColor:'#3b82f6',borderWidth:1.5,borderDash:[4,3]}}}},scales:{x:{ticks:{color:'#5a7090',maxTicksLimit:16,font:{family:'DM Mono',size:10}},grid:{color:'#1a2235'}},y:{ticks:{color:'#5a7090',font:{family:'DM Mono',size:10}},grid:{color:'#1a2235'}}}}
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'#5a7090',maxTicksLimit:18,font:{family:'DM Mono',size:10}},grid:{color:'#1a2235'}},
+        y:{ticks:{color:'#5a7090',font:{family:'DM Mono',size:10},callback:v=>v>=1000000||v<=-1000000?(v/1000000).toFixed(1)+'M':v>=1000||v<=-1000?(v/1000).toFixed(0)+'K':v},grid:{color:'#1a2235'}}
+      }
+    }
   });
 }
 
