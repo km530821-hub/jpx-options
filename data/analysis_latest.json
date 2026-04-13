@@ -1362,8 +1362,8 @@
       "atm_diff": -49,
       "atm_iv_pct": 24.44,
       "call_iv": 24.44,
-      "put_iv": 0.26,
-      "rr": 24.18,
+      "put_iv": 20.92,
+      "rr": 3.52,
       "max_pain": 56875.0,
       "mp_diff": -49,
       "gamma_flip": 56938,
@@ -1372,10 +1372,10 @@
       "call_wall": 57000.0,
       "put_wall": 56875.0,
       "pcr": 0.216,
-      "im": 3642,
-      "im_pct": 6.4,
-      "im_upper": 60517,
-      "im_lower": 53233,
+      "im": 3376,
+      "im_pct": 5.9,
+      "im_upper": 60251,
+      "im_lower": 53499,
       "atm_call_greeks": {
         "price": 1785.7,
         "delta": 0.5224,
@@ -2717,7 +2717,26 @@
           "theoretical": 0.475146,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 10,
+        "items": [
+          {
+            "strike": 57125.0,
+            "diff": 200.8
+          },
+          {
+            "strike": 57250.0,
+            "diff": 325.7
+          },
+          {
+            "strike": 57375.0,
+            "diff": 450.7
+          }
+        ]
+      },
+      "bf25": -1.76
     },
     {
       "month": "202606",
@@ -2727,8 +2746,8 @@
       "atm_diff": -49,
       "atm_iv_pct": 23.15,
       "call_iv": 23.15,
-      "put_iv": 0.27,
-      "rr": 22.88,
+      "put_iv": 21.68,
+      "rr": 1.47,
       "max_pain": 56875.0,
       "mp_diff": -49,
       "gamma_flip": 56938,
@@ -2737,10 +2756,10 @@
       "call_wall": 57000.0,
       "put_wall": 56875.0,
       "pcr": 0.438,
-      "im": 5343,
-      "im_pct": 9.4,
-      "im_upper": 62218,
-      "im_lower": 51532,
+      "im": 5169,
+      "im_pct": 9.1,
+      "im_upper": 62044,
+      "im_lower": 51706,
       "atm_call_greeks": {
         "price": 2620.02,
         "delta": 0.5298,
@@ -4014,7 +4033,26 @@
           "theoretical": 0.34796,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 10,
+        "items": [
+          {
+            "strike": 57125.0,
+            "diff": 200.7
+          },
+          {
+            "strike": 57250.0,
+            "diff": 325.5
+          },
+          {
+            "strike": 57375.0,
+            "diff": 450.4
+          }
+        ]
+      },
+      "bf25": -0.73
     },
     {
       "month": "202607",
@@ -4024,8 +4062,8 @@
       "atm_diff": -49,
       "atm_iv_pct": 22.74,
       "call_iv": 22.74,
-      "put_iv": 0.27,
-      "rr": 22.47,
+      "put_iv": 21.8,
+      "rr": 0.94,
       "max_pain": 56875.0,
       "mp_diff": -49,
       "gamma_flip": 56938,
@@ -4034,10 +4072,10 @@
       "call_wall": 57000.0,
       "put_wall": 56875.0,
       "pcr": 0.469,
-      "im": 6355,
-      "im_pct": 11.2,
-      "im_upper": 63230,
-      "im_lower": 50520,
+      "im": 6219,
+      "im_pct": 10.9,
+      "im_upper": 63094,
+      "im_lower": 50656,
       "atm_call_greeks": {
         "price": 3119.75,
         "delta": 0.5345,
@@ -5179,7 +5217,26 @@
           "theoretical": 0.28433,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 10,
+        "items": [
+          {
+            "strike": 57125.0,
+            "diff": 200.5
+          },
+          {
+            "strike": 57250.0,
+            "diff": 325.3
+          },
+          {
+            "strike": 57375.0,
+            "diff": 450.1
+          }
+        ]
+      },
+      "bf25": -0.47
     },
     {
       "month": "202608",
@@ -5189,8 +5246,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 21.98,
       "call_iv": 21.98,
-      "put_iv": 0.27,
-      "rr": 21.71,
+      "put_iv": 21.42,
+      "rr": 0.56,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -5199,10 +5256,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 0.442,
-      "im": 7262,
-      "im_pct": 12.8,
-      "im_upper": 64262,
-      "im_lower": 49738,
+      "im": 7180,
+      "im_pct": 12.6,
+      "im_upper": 64180,
+      "im_lower": 49820,
       "atm_call_greeks": {
         "price": 3513.09,
         "delta": 0.5335,
@@ -6105,7 +6162,26 @@
           "theoretical": 0.282574,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 325.1
+          },
+          {
+            "strike": 57500.0,
+            "diff": 574.5
+          },
+          {
+            "strike": 57750.0,
+            "diff": 823.9
+          }
+        ]
+      },
+      "bf25": -0.28
     },
     {
       "month": "202609",
@@ -6115,8 +6191,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 21.63,
       "call_iv": 21.63,
-      "put_iv": 0.26,
-      "rr": 21.37,
+      "put_iv": 21.3,
+      "rr": 0.33,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -6125,10 +6201,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 0.481,
-      "im": 7920,
-      "im_pct": 13.9,
-      "im_upper": 64920,
-      "im_lower": 49080,
+      "im": 7870,
+      "im_pct": 13.8,
+      "im_upper": 64870,
+      "im_lower": 49130,
       "atm_call_greeks": {
         "price": 3842.48,
         "delta": 0.5373,
@@ -7035,7 +7111,26 @@
           "theoretical": 0.276212,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 324.9
+          },
+          {
+            "strike": 57500.0,
+            "diff": 574.2
+          },
+          {
+            "strike": 57750.0,
+            "diff": 823.4
+          }
+        ]
+      },
+      "bf25": -0.17
     },
     {
       "month": "202610",
@@ -7045,8 +7140,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 22.0,
       "call_iv": 22.0,
-      "put_iv": 0.26,
-      "rr": 21.74,
+      "put_iv": 21.81,
+      "rr": 0.19,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -7055,10 +7150,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 0.505,
-      "im": 8769,
-      "im_pct": 15.4,
-      "im_upper": 65769,
-      "im_lower": 48231,
+      "im": 8744,
+      "im_pct": 15.3,
+      "im_upper": 65744,
+      "im_lower": 48256,
       "atm_call_greeks": {
         "price": 4263.18,
         "delta": 0.5417,
@@ -7913,7 +8008,26 @@
           "theoretical": 0.261272,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 324.7
+          },
+          {
+            "strike": 57500.0,
+            "diff": 573.8
+          },
+          {
+            "strike": 57750.0,
+            "diff": 823.0
+          }
+        ]
+      },
+      "bf25": -0.09
     },
     {
       "month": "202611",
@@ -7923,8 +8037,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 21.73,
       "call_iv": 21.73,
-      "put_iv": 0.26,
-      "rr": 21.47,
+      "put_iv": 21.77,
+      "rr": -0.04,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -7933,10 +8047,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 0.526,
-      "im": 9470,
-      "im_pct": 16.6,
-      "im_upper": 66470,
-      "im_lower": 47530,
+      "im": 9493,
+      "im_pct": 16.7,
+      "im_upper": 66493,
+      "im_lower": 47507,
       "atm_call_greeks": {
         "price": 4615.94,
         "delta": 0.5456,
@@ -8760,7 +8874,26 @@
           "theoretical": 0.259887,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 324.5
+          },
+          {
+            "strike": 57500.0,
+            "diff": 573.4
+          },
+          {
+            "strike": 57750.0,
+            "diff": 822.4
+          }
+        ]
+      },
+      "bf25": 0.02
     },
     {
       "month": "202612",
@@ -8770,8 +8903,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 21.16,
       "call_iv": 21.16,
-      "put_iv": 0.25,
-      "rr": 20.91,
+      "put_iv": 21.34,
+      "rr": -0.18,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -8780,10 +8913,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 0.599,
-      "im": 9810,
-      "im_pct": 17.2,
-      "im_upper": 66810,
-      "im_lower": 47190,
+      "im": 9863,
+      "im_pct": 17.3,
+      "im_upper": 66863,
+      "im_lower": 47137,
       "atm_call_greeks": {
         "price": 4792.67,
         "delta": 0.5479,
@@ -9706,7 +9839,26 @@
           "theoretical": 0.261214,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 324.3
+          },
+          {
+            "strike": 57500.0,
+            "diff": 573.1
+          },
+          {
+            "strike": 57750.0,
+            "diff": 821.9
+          }
+        ]
+      },
+      "bf25": 0.09
     },
     {
       "month": "202701",
@@ -9716,8 +9868,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 21.29,
       "call_iv": 21.29,
-      "put_iv": 0.26,
-      "rr": 21.03,
+      "put_iv": 21.6,
+      "rr": -0.31,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -9726,10 +9878,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 0.523,
-      "im": 10426,
-      "im_pct": 18.3,
-      "im_upper": 67426,
-      "im_lower": 46574,
+      "im": 10513,
+      "im_pct": 18.4,
+      "im_upper": 67513,
+      "im_lower": 46487,
       "atm_call_greeks": {
         "price": 5100.69,
         "delta": 0.5511,
@@ -10509,7 +10661,26 @@
           "theoretical": 0.253299,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 324.1
+          },
+          {
+            "strike": 57500.0,
+            "diff": 572.8
+          },
+          {
+            "strike": 57750.0,
+            "diff": 821.5
+          }
+        ]
+      },
+      "bf25": 0.15
     },
     {
       "month": "202702",
@@ -10519,8 +10690,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 21.06,
       "call_iv": 21.06,
-      "put_iv": 0.26,
-      "rr": 20.8,
+      "put_iv": 21.51,
+      "rr": -0.45,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -10529,10 +10700,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 0.481,
-      "im": 10960,
-      "im_pct": 19.3,
-      "im_upper": 67960,
-      "im_lower": 46040,
+      "im": 11091,
+      "im_pct": 19.5,
+      "im_upper": 68091,
+      "im_lower": 45909,
       "atm_call_greeks": {
         "price": 5373.4,
         "delta": 0.5542,
@@ -11305,7 +11476,26 @@
           "theoretical": 0.25135,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 323.9
+          },
+          {
+            "strike": 57500.0,
+            "diff": 572.4
+          },
+          {
+            "strike": 57750.0,
+            "diff": 820.9
+          }
+        ]
+      },
+      "bf25": 0.22
     },
     {
       "month": "202703",
@@ -11315,8 +11505,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 20.92,
       "call_iv": 20.92,
-      "put_iv": 0.26,
-      "rr": 20.66,
+      "put_iv": 21.47,
+      "rr": -0.55,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -11325,10 +11515,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 0.689,
-      "im": 11372,
-      "im_pct": 20.0,
-      "im_upper": 68372,
-      "im_lower": 45628,
+      "im": 11539,
+      "im_pct": 20.2,
+      "im_upper": 68539,
+      "im_lower": 45461,
       "atm_call_greeks": {
         "price": 5583.66,
         "delta": 0.5565,
@@ -12263,7 +12453,26 @@
           "theoretical": 0.252544,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 323.7
+          },
+          {
+            "strike": 57500.0,
+            "diff": 572.1
+          },
+          {
+            "strike": 57750.0,
+            "diff": 820.5
+          }
+        ]
+      },
+      "bf25": 0.28
     },
     {
       "month": "202704",
@@ -12273,8 +12482,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 21.28,
       "call_iv": 21.28,
-      "put_iv": 0.26,
-      "rr": 21.02,
+      "put_iv": 21.92,
+      "rr": -0.64,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -12283,10 +12492,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 0.569,
-      "im": 12047,
-      "im_pct": 21.2,
-      "im_upper": 69047,
-      "im_lower": 44953,
+      "im": 12244,
+      "im_pct": 21.5,
+      "im_upper": 69244,
+      "im_lower": 44756,
       "atm_call_greeks": {
         "price": 5918.62,
         "delta": 0.5597,
@@ -12851,7 +13060,26 @@
           "theoretical": 0.248112,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 323.6
+          },
+          {
+            "strike": 57500.0,
+            "diff": 571.8
+          },
+          {
+            "strike": 57750.0,
+            "diff": 820.0
+          }
+        ]
+      },
+      "bf25": 0.32
     },
     {
       "month": "202706",
@@ -12861,8 +13089,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 20.87,
       "call_iv": 20.87,
-      "put_iv": 0.26,
-      "rr": 20.61,
+      "put_iv": 21.71,
+      "rr": -0.84,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -12871,10 +13099,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 0.721,
-      "im": 12806,
-      "im_pct": 22.5,
-      "im_upper": 69806,
-      "im_lower": 44194,
+      "im": 13079,
+      "im_pct": 22.9,
+      "im_upper": 70079,
+      "im_lower": 43921,
       "atm_call_greeks": {
         "price": 6310.97,
         "delta": 0.5642,
@@ -13828,7 +14056,26 @@
           "theoretical": 0.248191,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 323.2
+          },
+          {
+            "strike": 57500.0,
+            "diff": 571.1
+          },
+          {
+            "strike": 57750.0,
+            "diff": 819.0
+          }
+        ]
+      },
+      "bf25": 0.42
     },
     {
       "month": "202709",
@@ -13838,8 +14085,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 20.71,
       "call_iv": 20.71,
-      "put_iv": 0.26,
-      "rr": 20.45,
+      "put_iv": 21.78,
+      "rr": -1.07,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -13848,10 +14095,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 0.852,
-      "im": 14002,
-      "im_pct": 24.6,
-      "im_upper": 71002,
-      "im_lower": 42998,
+      "im": 14384,
+      "im_pct": 25.2,
+      "im_upper": 71384,
+      "im_lower": 42616,
       "atm_call_greeks": {
         "price": 6923.51,
         "delta": 0.5707,
@@ -14563,7 +14810,26 @@
           "theoretical": 0.243772,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 322.6
+          },
+          {
+            "strike": 57500.0,
+            "diff": 570.0
+          },
+          {
+            "strike": 57750.0,
+            "diff": 817.5
+          }
+        ]
+      },
+      "bf25": 0.54
     },
     {
       "month": "202712",
@@ -14573,8 +14839,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 20.55,
       "call_iv": 20.55,
-      "put_iv": 0.26,
-      "rr": 20.29,
+      "put_iv": 21.83,
+      "rr": -1.28,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -14583,10 +14849,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 0.838,
-      "im": 15072,
-      "im_pct": 26.5,
-      "im_upper": 72072,
-      "im_lower": 41928,
+      "im": 15563,
+      "im_pct": 27.3,
+      "im_upper": 72563,
+      "im_lower": 41437,
       "atm_call_greeks": {
         "price": 7474.37,
         "delta": 0.5765,
@@ -15537,7 +15803,26 @@
           "theoretical": 0.241606,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 322.0
+          },
+          {
+            "strike": 57500.0,
+            "diff": 569.0
+          },
+          {
+            "strike": 57750.0,
+            "diff": 816.0
+          }
+        ]
+      },
+      "bf25": 0.64
     },
     {
       "month": "202806",
@@ -15547,8 +15832,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 20.01,
       "call_iv": 20.01,
-      "put_iv": 0.26,
-      "rr": 19.75,
+      "put_iv": 21.64,
+      "rr": -1.63,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -15557,10 +15842,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 1.127,
-      "im": 16735,
-      "im_pct": 29.4,
-      "im_upper": 73735,
-      "im_lower": 40265,
+      "im": 17441,
+      "im_pct": 30.6,
+      "im_upper": 74441,
+      "im_lower": 39559,
       "atm_call_greeks": {
         "price": 8346.98,
         "delta": 0.586,
@@ -16468,7 +16753,26 @@
           "theoretical": 0.23768,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 320.8
+          },
+          {
+            "strike": 57500.0,
+            "diff": 567.0
+          },
+          {
+            "strike": 57750.0,
+            "diff": 813.1
+          }
+        ]
+      },
+      "bf25": 0.82
     },
     {
       "month": "202812",
@@ -16478,8 +16782,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 19.55,
       "call_iv": 19.55,
-      "put_iv": 0.26,
-      "rr": 19.29,
+      "put_iv": 21.49,
+      "rr": -1.94,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -16488,10 +16792,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 1.185,
-      "im": 18146,
-      "im_pct": 31.9,
-      "im_upper": 75146,
-      "im_lower": 38854,
+      "im": 19067,
+      "im_pct": 33.5,
+      "im_upper": 76067,
+      "im_lower": 37933,
       "atm_call_greeks": {
         "price": 9096.9,
         "delta": 0.5943,
@@ -17407,7 +17711,26 @@
           "theoretical": 0.243471,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 319.7
+          },
+          {
+            "strike": 57500.0,
+            "diff": 564.9
+          },
+          {
+            "strike": 57750.0,
+            "diff": 810.1
+          }
+        ]
+      },
+      "bf25": 0.97
     },
     {
       "month": "202906",
@@ -17417,8 +17740,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 19.06,
       "call_iv": 19.06,
-      "put_iv": 0.26,
-      "rr": 18.8,
+      "put_iv": 21.3,
+      "rr": -2.24,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -17427,10 +17750,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 1.236,
-      "im": 19280,
-      "im_pct": 33.9,
-      "im_upper": 76280,
-      "im_lower": 37720,
+      "im": 20435,
+      "im_pct": 35.9,
+      "im_upper": 77435,
+      "im_lower": 36565,
       "atm_call_greeks": {
         "price": 9713.93,
         "delta": 0.6013,
@@ -18354,7 +18677,26 @@
           "theoretical": 0.238976,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 318.5
+          },
+          {
+            "strike": 57500.0,
+            "diff": 562.9
+          },
+          {
+            "strike": 57750.0,
+            "diff": 807.2
+          }
+        ]
+      },
+      "bf25": 1.12
     },
     {
       "month": "202912",
@@ -18364,8 +18706,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 18.65,
       "call_iv": 18.65,
-      "put_iv": 0.26,
-      "rr": 18.39,
+      "put_iv": 21.15,
+      "rr": -2.5,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -18374,10 +18716,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 1.274,
-      "im": 20350,
-      "im_pct": 35.7,
-      "im_upper": 77350,
-      "im_lower": 36650,
+      "im": 21742,
+      "im_pct": 38.1,
+      "im_upper": 78742,
+      "im_lower": 35258,
       "atm_call_greeks": {
         "price": 10301.52,
         "delta": 0.6079,
@@ -19305,7 +19647,26 @@
           "theoretical": 0.234362,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 317.3
+          },
+          {
+            "strike": 57500.0,
+            "diff": 560.8
+          },
+          {
+            "strike": 57750.0,
+            "diff": 804.2
+          }
+        ]
+      },
+      "bf25": 1.25
     },
     {
       "month": "203006",
@@ -19315,8 +19676,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 18.31,
       "call_iv": 18.31,
-      "put_iv": 0.26,
-      "rr": 18.05,
+      "put_iv": 21.04,
+      "rr": -2.73,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -19325,10 +19686,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 1.29,
-      "im": 21285,
-      "im_pct": 37.4,
-      "im_upper": 78285,
-      "im_lower": 35715,
+      "im": 22908,
+      "im_pct": 40.2,
+      "im_upper": 79908,
+      "im_lower": 34092,
       "atm_call_greeks": {
         "price": 10820.36,
         "delta": 0.6138,
@@ -20260,7 +20621,26 @@
           "theoretical": 0.228471,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 316.2
+          },
+          {
+            "strike": 57500.0,
+            "diff": 558.7
+          },
+          {
+            "strike": 57750.0,
+            "diff": 801.3
+          }
+        ]
+      },
+      "bf25": 1.37
     },
     {
       "month": "203012",
@@ -20270,8 +20650,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 17.95,
       "call_iv": 17.95,
-      "put_iv": 0.26,
-      "rr": 17.69,
+      "put_iv": 20.9,
+      "rr": -2.95,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -20280,10 +20660,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 1.329,
-      "im": 22083,
-      "im_pct": 38.8,
-      "im_upper": 79083,
-      "im_lower": 34917,
+      "im": 23930,
+      "im_pct": 42.0,
+      "im_upper": 80930,
+      "im_lower": 33070,
       "atm_call_greeks": {
         "price": 11273.81,
         "delta": 0.6191,
@@ -21223,7 +21603,26 @@
           "theoretical": 0.220238,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 315.0
+          },
+          {
+            "strike": 57500.0,
+            "diff": 556.7
+          },
+          {
+            "strike": 57750.0,
+            "diff": 798.4
+          }
+        ]
+      },
+      "bf25": 1.48
     },
     {
       "month": "203106",
@@ -21233,8 +21632,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 17.65,
       "call_iv": 17.65,
-      "put_iv": 0.26,
-      "rr": 17.39,
+      "put_iv": 20.81,
+      "rr": -3.16,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -21243,10 +21642,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 1.514,
-      "im": 22846,
-      "im_pct": 40.1,
-      "im_upper": 79846,
-      "im_lower": 34154,
+      "im": 24923,
+      "im_pct": 43.7,
+      "im_upper": 81923,
+      "im_lower": 32077,
       "atm_call_greeks": {
         "price": 11709.43,
         "delta": 0.6241,
@@ -22164,7 +22563,26 @@
           "theoretical": 0.212798,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 313.9
+          },
+          {
+            "strike": 57500.0,
+            "diff": 554.7
+          },
+          {
+            "strike": 57750.0,
+            "diff": 795.5
+          }
+        ]
+      },
+      "bf25": 1.58
     },
     {
       "month": "203112",
@@ -22174,8 +22592,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 17.32,
       "call_iv": 17.32,
-      "put_iv": 0.26,
-      "rr": 17.06,
+      "put_iv": 20.67,
+      "rr": -3.35,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -22184,10 +22602,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 1.539,
-      "im": 23467,
-      "im_pct": 41.2,
-      "im_upper": 80467,
-      "im_lower": 33533,
+      "im": 25778,
+      "im_pct": 45.2,
+      "im_upper": 82778,
+      "im_lower": 31222,
       "atm_call_greeks": {
         "price": 12078.06,
         "delta": 0.6286,
@@ -23109,7 +23527,26 @@
           "theoretical": 0.208022,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 312.8
+          },
+          {
+            "strike": 57500.0,
+            "diff": 552.7
+          },
+          {
+            "strike": 57750.0,
+            "diff": 792.7
+          }
+        ]
+      },
+      "bf25": 1.68
     },
     {
       "month": "203206",
@@ -23119,8 +23556,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 17.03,
       "call_iv": 17.03,
-      "put_iv": 0.27,
-      "rr": 16.76,
+      "put_iv": 20.57,
+      "rr": -3.54,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -23129,10 +23566,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 1.56,
-      "im": 24076,
-      "im_pct": 42.3,
-      "im_upper": 81076,
-      "im_lower": 32924,
+      "im": 26612,
+      "im_pct": 46.7,
+      "im_upper": 83612,
+      "im_lower": 30388,
       "atm_call_greeks": {
         "price": 12440.26,
         "delta": 0.6329,
@@ -24058,7 +24495,26 @@
           "theoretical": 0.207189,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 311.7
+          },
+          {
+            "strike": 57500.0,
+            "diff": 550.7
+          },
+          {
+            "strike": 57750.0,
+            "diff": 789.8
+          }
+        ]
+      },
+      "bf25": 1.77
     },
     {
       "month": "203212",
@@ -24068,8 +24524,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 16.74,
       "call_iv": 16.74,
-      "put_iv": 0.27,
-      "rr": 16.47,
+      "put_iv": 20.46,
+      "rr": -3.72,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -24078,10 +24534,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 1.577,
-      "im": 24607,
-      "im_pct": 43.2,
-      "im_upper": 81607,
-      "im_lower": 32393,
+      "im": 27372,
+      "im_pct": 48.0,
+      "im_upper": 84372,
+      "im_lower": 29628,
       "atm_call_greeks": {
         "price": 12765.35,
         "delta": 0.637,
@@ -25003,7 +25459,26 @@
           "theoretical": 0.20957,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 310.5
+          },
+          {
+            "strike": 57500.0,
+            "diff": 548.7
+          },
+          {
+            "strike": 57750.0,
+            "diff": 787.0
+          }
+        ]
+      },
+      "bf25": 1.86
     },
     {
       "month": "203306",
@@ -25013,8 +25488,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 16.5,
       "call_iv": 16.5,
-      "put_iv": 0.27,
-      "rr": 16.23,
+      "put_iv": 20.39,
+      "rr": -3.89,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -25023,10 +25498,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 1.671,
-      "im": 25139,
-      "im_pct": 44.2,
-      "im_upper": 82139,
-      "im_lower": 31861,
+      "im": 28141,
+      "im_pct": 49.4,
+      "im_upper": 85141,
+      "im_lower": 28859,
       "atm_call_greeks": {
         "price": 13089.9,
         "delta": 0.6409,
@@ -25941,7 +26416,26 @@
           "theoretical": 0.207063,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 309.4
+          },
+          {
+            "strike": 57500.0,
+            "diff": 546.8
+          },
+          {
+            "strike": 57750.0,
+            "diff": 784.1
+          }
+        ]
+      },
+      "bf25": 1.95
     },
     {
       "month": "203312",
@@ -25951,8 +26445,8 @@
       "atm_diff": 76,
       "atm_iv_pct": 16.26,
       "call_iv": 16.26,
-      "put_iv": 0.27,
-      "rr": 15.99,
+      "put_iv": 20.32,
+      "rr": -4.06,
       "max_pain": 56750.0,
       "mp_diff": -174,
       "gamma_flip": 56875,
@@ -25961,10 +26455,10 @@
       "call_wall": 57000.0,
       "put_wall": 56750.0,
       "pcr": 1.243,
-      "im": 25622,
-      "im_pct": 45.0,
-      "im_upper": 82622,
-      "im_lower": 31378,
+      "im": 28859,
+      "im_pct": 50.6,
+      "im_upper": 85859,
+      "im_lower": 28141,
       "atm_call_greeks": {
         "price": 13391.11,
         "delta": 0.6446,
@@ -26811,7 +27305,26 @@
           "theoretical": 0.205281,
           "delta": 0.2709
         }
-      ]
+      ],
+      "iv_warning": null,
+      "parity_warning": {
+        "count": 5,
+        "items": [
+          {
+            "strike": 57250.0,
+            "diff": 308.3
+          },
+          {
+            "strike": 57500.0,
+            "diff": 544.8
+          },
+          {
+            "strike": 57750.0,
+            "diff": 781.3
+          }
+        ]
+      },
+      "bf25": 2.03
     }
   ]
 }
