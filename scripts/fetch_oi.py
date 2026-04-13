@@ -27,9 +27,13 @@ log = logging.getLogger(__name__)
 DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
 
-BASE_URL = "https://www.jpx.co.jp/markets/derivatives/trading-volume/tvdivq00000014nn-att/{date}_market_data_daytime.xlsx"
+# 2026/4/13以降: ファイル名が whole_day に変更
+# 建玉残高専用ファイルは 20:00 公開（こちらを優先）
+BASE_URL_OI         = "https://www.jpx.co.jp/markets/derivatives/trading-volume/tvdivq00000014nn-att/{date}open_interest.xlsx"
+BASE_URL_WHOLE_DAY  = "https://www.jpx.co.jp/markets/derivatives/trading-volume/tvdivq00000014nn-att/{date}_market_data_whole_day.xlsx"
+BASE_URL_OLD        = "https://www.jpx.co.jp/markets/derivatives/trading-volume/tvdivq00000014nn-att/{date}_market_data_daytime.xlsx"
 
-# 4/13以降の新シート名
+# シート名（4/13以降: market_data_OP）
 SHEET_OP_NEW   = "market_data_OP"
 SHEET_OP_OLD   = "デリバティブ取引市況（日中）"
 
@@ -48,17 +52,29 @@ def prev_business_days(n=5):
     return days
 
 
-def fetch_excel(target_date: str) -> bytes | None:
-    url = BASE_URL.format(date=target_date)
-    try:
-        r = requests.get(url, headers=HEADERS, timeout=30)
-        if r.status_code == 200:
-            log.info("Excel取得成功: %s (%d bytes)", url, len(r.content))
-            return r.content
-        log.warning("HTTP %d: %s", r.status_code, url)
-    except Exception as e:
-        log.error("接続エラー: %s", e)
-    return None
+def fetch_excel(target_date: str) -> tuple[bytes | None, str | None]:
+    """
+    建玉残高Excel を取得。優先順:
+    1. open_interest.xlsx (建玉残高専用, 20:00公開)
+    2. market_data_whole_day.xlsx (日通し, 17:30公開, 4/13以降)
+    3. market_data_daytime.xlsx (旧形式)
+    戻り値: (バイト列, 使用URL)
+    """
+    urls = [
+        BASE_URL_OI.format(date=target_date),
+        BASE_URL_WHOLE_DAY.format(date=target_date),
+        BASE_URL_OLD.format(date=target_date),
+    ]
+    for url in urls:
+        try:
+            r = requests.get(url, headers=HEADERS, timeout=30)
+            if r.status_code == 200:
+                log.info("Excel取得成功: %s (%d bytes)", url, len(r.content))
+                return r.content, url
+            log.warning("HTTP %d: %s", r.status_code, url)
+        except Exception as e:
+            log.error("接続エラー: %s", e)
+    return None, None
 
 
 def find_sheet(wb: openpyxl.Workbook) -> openpyxl.worksheet.worksheet.Worksheet | None:
@@ -72,7 +88,13 @@ def find_sheet(wb: openpyxl.Workbook) -> openpyxl.worksheet.worksheet.Worksheet 
         if "OP" in name or "オプション" in name or "option" in name.lower():
             log.info("シート発見(部分一致): %s", name)
             return wb[name]
-    log.warning("オプションシートが見つかりません。利用可能: %s", wb.sheetnames)
+    # open_interest.xlsx の場合、シート名が異なる可能性
+    # 全シートを表示して部分一致で探す
+    log.warning("オプションシートが見つかりません。利用可能シート: %s", wb.sheetnames)
+    # フォールバック: 最初のシートを試す
+    if wb.sheetnames:
+        log.info("フォールバック: 最初のシート '%s' を使用", wb.sheetnames[0])
+        return wb[wb.sheetnames[0]]
     return None
 
 
@@ -220,15 +242,18 @@ def main():
 
     raw = None
     used_date = None
+    used_url = None
     for d in candidates:
-        raw = fetch_excel(d)
+        raw, used_url = fetch_excel(d)
         if raw:
             used_date = d
             break
 
     if not raw:
-        log.warning("Excel取得失敗 → OIデータなしでスキップ（17時以降に再実行）")
+        log.warning("Excel取得失敗 → OIデータなしでスキップ")
         sys.exit(0)
+
+    log.info("使用ファイル: %s", used_url)
 
     wb = openpyxl.load_workbook(io.BytesIO(raw), data_only=True)
     ws = find_sheet(wb)
