@@ -194,12 +194,17 @@ def calc_pcr(df, S):
 
 def calc_gex(df, S, T, r=0.005):
     """
-    GEX計算。
-    OTMコール（K>S）: GEX = +Gamma × CallClose（OI代用）× S^2/100
-    OTMプット（K<S）: GEX = -Gamma × CallClose（OI代用）× S^2/100
-    → コールはディーラーがデルタヘッジでロングガンマ（安定化）
-    → プットはディーラーがショートガンマ（不安定化）
-    GEXが正→負に転じる行使価格がGammaFlip
+    GEX計算（時間価値OI代用版）。
+
+    OIの代用として「時間価値」を使用:
+    - K >= S (OTMコール): OI = CallClose（本質的価値=0なので時間価値=CallClose）
+    - K <  S (OTMプット): OI = CallClose - (S - K) = 時間価値
+      ※ K<SのCallCloseはITMコール終値 = 本質的価値(S-K) + 時間価値
+      ※ 時間価値のみを使うことでATM付近が最大のOI分布になる
+
+    GEX符号:
+    - K >= S (コール): +GEX（ディーラーロングガンマ→安定化）
+    - K <  S (プット): -GEX（ディーラーショートガンマ→不安定化）
     """
     gex_list = []
     for _, row in df.iterrows():
@@ -207,21 +212,31 @@ def calc_gex(df, S, T, r=0.005):
         cc = row.get("CallClose")
         if pd.isna(K) or pd.isna(cc) or float(cc) <= 0:
             continue
-        # IV逆算: OTMコール=コール、OTMプット=プット
-        opt_type = "C" if K >= S else "P"
-        iv_dec = implied_vol(S, K, T, float(cc), opt_type, r)
-        if iv_dec is None:
+        K_f = float(K)
+        cc_f = float(cc)
+
+        # 時間価値をOI代用として計算
+        intrinsic = max(S - K_f, 0)   # コールの本質的価値
+        time_value = max(0.0, cc_f - intrinsic)
+        if time_value <= 0:
             continue
-        g = bs_greeks(S, K, T, iv_dec, "C", r)
+
+        # IV逆算: OTMコール=コール価格、OTMプット=プット価格（put-call parity）
+        opt_type = "C" if K_f >= S else "P"
+        # プット価格 ≈ 時間価値（ATM付近で成立）
+        price_for_iv = time_value if K_f < S else cc_f
+        iv_dec = implied_vol(S, K_f, T, price_for_iv, opt_type, r)
+        if iv_dec is None:
+            # フォールバック: ATM IVを使用
+            iv_dec = 0.23
+        g = bs_greeks(S, K_f, T, iv_dec, "C", r)
         if not g:
             continue
         gamma = g["gamma"]
-        oi = float(cc)  # CallClose をOI代用
-        # コール(K>=S)は+GEX、プット(K<S)は-GEX
-        sign = 1.0 if K >= S else -1.0
+        sign = 1.0 if K_f >= S else -1.0
         gex_list.append({
-            "StrikePrice": K,
-            "GEX": round(sign * gamma * oi * S * S / 100, 2)
+            "StrikePrice": K_f,
+            "GEX": round(sign * gamma * time_value * S * S / 100, 2)
         })
     if not gex_list:
         return pd.DataFrame(columns=["StrikePrice", "GEX"])
