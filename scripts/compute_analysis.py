@@ -194,50 +194,65 @@ def calc_pcr(df, S):
 
 def calc_gex(df, S, T, r=0.005):
     """
-    GEX計算（時間価値OI代用版）。
+    GEX計算（正式定義準拠版）。
 
-    OIの代用として「時間価値」を使用:
-    - K >= S (OTMコール): OI = CallClose（本質的価値=0なので時間価値=CallClose）
-    - K <  S (OTMプット): OI = CallClose - (S - K) = 時間価値
-      ※ K<SのCallCloseはITMコール終値 = 本質的価値(S-K) + 時間価値
-      ※ 時間価値のみを使うことでATM付近が最大のOI分布になる
+    正式定義:
+      GEX(K) = (CALL建玉 × CALL_Gamma - PUT建玉 × PUT_Gamma) × 先物価格 × 契約乗数
 
-    GEX符号:
-    - K >= S (コール): +GEX（ディーラーロングガンマ→安定化）
-    - K <  S (プット): -GEX（ディーラーショートガンマ→不安定化）
+    実OI（fetch_oi.py）がない場合のOI代用:
+      CALL建玉代用 = CallClose（コール終値） ← OTMコール(K>=S)で有効
+      PUT建玉代用  = CallClose の時間価値（コール終値 - 本質的価値）
+                   = CallClose - max(S-K, 0)
+                   ※ put-call parityより PUT時間価値 ≈ CALL時間価値（ATM付近）
+
+    日経225オプション契約乗数 = 1,000円/pt（本来だがここでは相対スケールのみ）
+
+    GEX+ゾーン → MMが価格安定化ヘッジ（上昇時売り・下落時買い）
+    GEX-ゾーン → MMが価格不安定化ヘッジ（上昇時買い・下落時売り）
     """
     gex_list = []
     for _, row in df.iterrows():
-        K  = row["StrikePrice"]
-        cc = row.get("CallClose")
-        if pd.isna(K) or pd.isna(cc) or float(cc) <= 0:
+        K   = row.get("StrikePrice")
+        cc  = row.get("CallClose")
+        if pd.isna(K) or pd.isna(cc):
             continue
-        K_f = float(K)
+        K_f  = float(K)
         cc_f = float(cc)
-
-        # 時間価値をOI代用として計算
-        intrinsic = max(S - K_f, 0)   # コールの本質的価値
-        time_value = max(0.0, cc_f - intrinsic)
-        if time_value <= 0:
+        if cc_f <= 0:
             continue
 
-        # IV逆算: OTMコール=コール価格、OTMプット=プット価格（put-call parity）
-        opt_type = "C" if K_f >= S else "P"
-        # プット価格 ≈ 時間価値（ATM付近で成立）
-        price_for_iv = time_value if K_f < S else cc_f
-        iv_dec = implied_vol(S, K_f, T, price_for_iv, opt_type, r)
+        # コール建玉代用（OTMコール終値）
+        call_oi = cc_f if K_f >= S else 0.0
+
+        # プット建玉代用（時間価値 = CallClose - 本質的価値）
+        # put-call parity: P ≈ C - (S-K)e^{-rT} ≈ C - (S-K) for short T
+        intrinsic = max(S - K_f, 0.0)
+        put_oi = max(0.0, cc_f - intrinsic) if K_f < S else 0.0
+
+        # どちらも0なら skip
+        if call_oi <= 0 and put_oi <= 0:
+            continue
+
+        # IV逆算（OTMコール優先、なければプット時間価値で逆算）
+        if K_f >= S and call_oi > 0:
+            iv_dec = implied_vol(S, K_f, T, call_oi, "C", r)
+        else:
+            iv_dec = implied_vol(S, K_f, T, put_oi, "P", r) if put_oi > 0 else None
+
         if iv_dec is None:
-            # フォールバック: ATM IVを使用
-            iv_dec = 0.23
+            iv_dec = 0.23  # フォールバック
+
+        # コール・プット両方のガンマ（BS上は同じ値）
         g = bs_greeks(S, K_f, T, iv_dec, "C", r)
         if not g:
             continue
         gamma = g["gamma"]
-        sign = 1.0 if K_f >= S else -1.0
-        gex_list.append({
-            "StrikePrice": K_f,
-            "GEX": round(sign * gamma * time_value * S * S / 100, 2)
-        })
+
+        # GEX = (CALL建玉 × CALL_Gamma - PUT建玉 × PUT_Gamma) × S × 乗数
+        # 乗数は相対スケール（/100 で単位調整）
+        gex = (call_oi * gamma - put_oi * gamma) * S * S / 100
+        gex_list.append({"StrikePrice": K_f, "GEX": round(gex, 2)})
+
     if not gex_list:
         return pd.DataFrame(columns=["StrikePrice", "GEX"])
     return pd.DataFrame(gex_list).groupby("StrikePrice")["GEX"].sum().reset_index()
@@ -271,6 +286,75 @@ def find_gamma_flip(gex_df, S):
     return flip
 
 # ── ATM IV取得（有効値のみ）─────────────────────────
+
+
+# ── 追加指標ヘルパー ──────────────────────────────────
+
+def _calc_iv_warning(call_iv, put_iv):
+    """
+    IV警告: CALL IVとPUT IVの乖離チェック。
+    差が10.0%超で警告、20.0%超で乖離大。
+    CALL>PUTかつ差15.0%超でスキュー異常（CALL IVを無効化）。
+    ATM専用上限60%、OTM上限200%。
+    """
+    if not call_iv or not put_iv:
+        return None
+    diff = abs(call_iv - put_iv)
+    if diff >= 20.0:
+        return {"level": "danger", "message": f"IV乖離大 CALL={call_iv:.1f}% PUT={put_iv:.1f}% 差={diff:.1f}%"}
+    if call_iv > put_iv and diff >= 15.0:
+        return {"level": "warning", "message": f"スキュー異常 CALL IV過大 差={diff:.1f}%"}
+    if diff >= 10.0:
+        return {"level": "caution", "message": f"IV乖離注意 差={diff:.1f}%"}
+    if call_iv > 60.0 or put_iv > 60.0:
+        return {"level": "caution", "message": f"高IV警告 ATM上限60%超"}
+    return None
+
+def _calc_parity_warning(df, S, T, atm_strike, r=0.005, tol_base=200):
+    """
+    パリティ検証: プット-コール パリティ P_theory = C - (F-K)×exp(-rT)
+    清算値と理論値の乖離が許容幅超で警告。
+    許容幅: DTE≤3日×3.0=600円、≤7日×2.0=400円、標準=200円。
+    """
+    warnings = []
+    tol = tol_base
+    dte_days = max(int(T * 252), 0)
+    if dte_days <= 3:
+        tol = 600
+    elif dte_days <= 7:
+        tol = 400
+
+    for _, row in df.iterrows():
+        K = row.get("StrikePrice")
+        cc = row.get("CallClose")
+        if pd.isna(K) or pd.isna(cc) or float(cc) <= 0:
+            continue
+        K_f = float(K)
+        cc_f = float(cc)
+        intrinsic = max(S - K_f, 0)
+        put_tv = max(0.0, cc_f - intrinsic)
+        if put_tv <= 0:
+            continue
+        # P_theory = C - (F-K)×e^{-rT}
+        p_theory = cc_f - (S - K_f) * math.exp(-r * T)
+        p_actual = put_tv  # プット終値の近似
+        diff = abs(p_actual - p_theory)
+        if diff > tol and abs(K_f - atm_strike) < 1500:
+            warnings.append({"strike": K_f, "diff": round(diff, 1)})
+
+    if warnings:
+        return {"count": len(warnings), "items": warnings[:3]}
+    return None
+
+def _calc_bf25(call_iv, put_iv, atm_iv):
+    """
+    25Δ バタフライ: (25Δ CALL IV + 25Δ PUT IV) / 2 - ATM IV
+    値が大きいほどテールリスク（急騰・急落）を強く警戒。
+    """
+    if not call_iv or not put_iv or not atm_iv:
+        return None
+    bf = (call_iv + put_iv) / 2 - atm_iv
+    return round(bf, 2)
 
 def get_atm_iv(df, S, T, r=0.005):
     """
@@ -383,18 +467,39 @@ def analyze_month(df_m, S, month_str, today, oi_data=None):
     iv_near["dist"] = (iv_near["StrikePrice"] - S).abs()
     iv_near_sorted = iv_near.sort_values("dist")
 
-    call_iv = round(atm_iv_dec * 100, 2)  # ATM IVをコールIVとして使用
-    # プットIVはATMより少し低い行使価格のIV
-    put_side = iv_near_sorted[iv_near_sorted["StrikePrice"] < atm_strike]
-    put_iv   = round(float(put_side.iloc[0]["IV"]) * 100, 2) if not put_side.empty else call_iv
-    if put_iv > 1:  # パーセント表記チェック
-        put_iv = round(put_iv / 100, 2)
+    # CALL IV: ATMより上の最近傍OTMコールのIV（get_atm_iv はOTMコールで逆算済み）
+    call_iv = round(atm_iv_dec * 100, 2)
+
+    # PUT IV: ATMより下の最近傍OTMプットのIV
+    # CallCloseの時間価値からプットIVを逆算
+    put_iv_raw = None
+    df_put_side = df_m[df_m["StrikePrice"] < atm_strike].copy()
+    df_put_side = df_put_side.sort_values("StrikePrice", ascending=False)
+    for _, pr in df_put_side.iterrows():
+        K_p = pr.get("StrikePrice")
+        cc_p = pr.get("CallClose")
+        if pd.isna(K_p) or pd.isna(cc_p) or float(cc_p) <= 0:
+            continue
+        put_tv = max(0.0, float(cc_p) - max(S - float(K_p), 0))
+        if put_tv <= 0:
+            continue
+        iv_p = implied_vol(S, float(K_p), T, put_tv, "P")
+        if iv_p is not None:
+            put_iv_raw = round(iv_p * 100, 2)
+            break
+    put_iv = put_iv_raw if put_iv_raw else call_iv
 
     rr = round(call_iv - put_iv, 2)
 
-    # Implied Move（ATM IV × √(DTE/365) × 先物）
-    im     = round(S * atm_iv_dec * (dte / 365) ** 0.5) if dte > 0 else None
-    im_pct = round(im / S * 100, 1) if im else None
+    # Implied Move: ATM IV × √(残存日数/365) × ATM価格
+    # CALL IV と PUT IV の両方が有効な場合のみ算出（片側欠損は None）
+    if dte > 0 and call_iv > 0 and put_iv > 0:
+        # 両方の平均IVを使用
+        avg_iv = (call_iv + put_iv) / 2 / 100  # % → 小数
+        im     = round(atm_strike * avg_iv * (dte / 365) ** 0.5)
+        im_pct = round(im / atm_strike * 100, 1)
+    else:
+        im = im_pct = None
 
     # IV・価格サマリー（ATM±30%）
     lower, upper = S * 0.70, S * 1.30
@@ -449,6 +554,10 @@ def analyze_month(df_m, S, month_str, today, oi_data=None):
         "atm_put_greeks":  put_g,
         "gex_by_strike":   gex_df.to_dict(orient="records"),
         "strikes_summary": strikes_summary,
+        # ── 追加指標 ──
+        "iv_warning":      _calc_iv_warning(call_iv, put_iv),
+        "parity_warning":  _calc_parity_warning(df_m, S, T, atm_strike),
+        "bf25":            _calc_bf25(call_iv, put_iv, atm_iv_dec * 100),
     }
 
 # ── メイン ────────────────────────────────────────
