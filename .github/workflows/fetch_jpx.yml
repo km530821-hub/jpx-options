@@ -2,9 +2,10 @@ name: JPX Options Data Fetch
 
 on:
   schedule:
-    # 毎営業日 19:00 JST (10:00 UTC)
-    # JPX OI Excel は 17:00〜18:00 JST に公開されるため 19:00 で確実に取得
+    # 19:00 JST (10:00 UTC) - 理論価格CSV取得
     - cron: '0 10 * * 1-5'
+    # 21:00 JST (12:00 UTC) - 建玉残高Excel取得（20:00公開後）
+    - cron: '0 12 * * 1-5'
   workflow_dispatch:
     inputs:
       date:
