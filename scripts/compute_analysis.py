@@ -192,65 +192,85 @@ def calc_pcr(df, S):
 
 # ── GEX・GammaFlip ──────────────────────────────────
 
-def calc_gex(df, S, T, r=0.005):
+def calc_gex(df, S, T, oi_data=None, r=0.005):
     """
-    GEX計算（正式定義準拠版）。
+    GEX計算（正式定義準拠版・実OI対応）。
 
-    正式定義:
-      GEX(K) = (CALL建玉 × CALL_Gamma - PUT建玉 × PUT_Gamma) × 先物価格 × 契約乗数
+    正式定義（画像資料準拠）:
+      GEX(K) = (CALL建玉 × Gamma - PUT建玉 × Gamma) × 先物価格 × 契約乗数
+      ※ BS上 CALL_Gamma = PUT_Gamma（同一行使価格・同一IV）
 
-    実OI（fetch_oi.py）がない場合のOI代用:
-      CALL建玉代用 = CallClose（コール終値） ← OTMコール(K>=S)で有効
-      PUT建玉代用  = CallClose の時間価値（コール終値 - 本質的価値）
-                   = CallClose - max(S-K, 0)
-                   ※ put-call parityより PUT時間価値 ≈ CALL時間価値（ATM付近）
+    MMの立場:
+      投資家がコールを買う → MMはショートコール → デルタヘッジでロングガンマ → GEX+
+      投資家がプットを買う → MMはショートプット → デルタヘッジでショートガンマ → GEX-
 
-    日経225オプション契約乗数 = 1,000円/pt（本来だがここでは相対スケールのみ）
+    GEX+ → 安定化ヘッジ（上昇時売り・下落時買い）：価格を安定させる
+    GEX- → 不安定化ヘッジ（上昇時買い・下落時売り）：価格変動を増幅する
 
-    GEX+ゾーン → MMが価格安定化ヘッジ（上昇時売り・下落時買い）
-    GEX-ゾーン → MMが価格不安定化ヘッジ（上昇時買い・下落時売り）
+    建玉データ:
+      実OI（oi_data）がある場合: call_oi, put_oi を直接使用
+      ない場合（代用）:
+        CALL建玉代用 = K>=S の OTMコール終値（CallClose）
+        PUT建玉代用  = K< S の 時間価値（CallClose - コール本質的価値）
+                      ※ put-call parity より時間価値はコール≈プット
+
+    乗数: 日経225オプション 1,000円/pt（相対スケールとして S²/100 を使用）
     """
     gex_list = []
+
     for _, row in df.iterrows():
-        K   = row.get("StrikePrice")
-        cc  = row.get("CallClose")
-        if pd.isna(K) or pd.isna(cc):
+        K  = row.get("StrikePrice")
+        cc = row.get("CallClose")
+        if pd.isna(K):
             continue
-        K_f  = float(K)
-        cc_f = float(cc)
-        if cc_f <= 0:
-            continue
+        K_f = float(K)
 
-        # コール建玉代用（OTMコール終値）
-        call_oi = cc_f if K_f >= S else 0.0
+        # ── 建玉の決定 ──
+        if oi_data is not None:
+            # 実OI使用（fetch_oi.py で取得済み）
+            oi_entry = oi_data.get(K_f) or oi_data.get(int(K_f))
+            if not oi_entry:
+                continue
+            call_oi = float(oi_entry.get("call_oi", 0))
+            put_oi  = float(oi_entry.get("put_oi",  0))
+        else:
+            # 建玉代用（終値ベース）
+            if pd.isna(cc) or float(cc) <= 0:
+                continue
+            cc_f = float(cc)
+            intrinsic = max(S - K_f, 0.0)
+            if K_f >= S:
+                call_oi = cc_f        # OTMコール終値
+                put_oi  = 0.0
+            else:
+                call_oi = 0.0
+                put_oi  = max(0.0, cc_f - intrinsic)  # 時間価値 = プット建玉代用
 
-        # プット建玉代用（時間価値 = CallClose - 本質的価値）
-        # put-call parity: P ≈ C - (S-K)e^{-rT} ≈ C - (S-K) for short T
-        intrinsic = max(S - K_f, 0.0)
-        put_oi = max(0.0, cc_f - intrinsic) if K_f < S else 0.0
-
-        # どちらも0なら skip
         if call_oi <= 0 and put_oi <= 0:
             continue
 
-        # IV逆算（OTMコール優先、なければプット時間価値で逆算）
+        # ── IV逆算 ──
         if K_f >= S and call_oi > 0:
-            iv_dec = implied_vol(S, K_f, T, call_oi, "C", r)
+            iv_dec = implied_vol(S, K_f, T, float(cc) if not pd.isna(cc) else call_oi, "C", r)
+        elif K_f < S and put_oi > 0:
+            iv_dec = implied_vol(S, K_f, T, put_oi, "P", r)
         else:
-            iv_dec = implied_vol(S, K_f, T, put_oi, "P", r) if put_oi > 0 else None
+            iv_dec = None
 
         if iv_dec is None:
-            iv_dec = 0.23  # フォールバック
+            # ATM IVをフォールバック（0.23）
+            iv_dec = 0.23
 
-        # コール・プット両方のガンマ（BS上は同じ値）
+        # ── ガンマ計算（BS: コールとプットで同値）──
         g = bs_greeks(S, K_f, T, iv_dec, "C", r)
         if not g:
             continue
         gamma = g["gamma"]
 
-        # GEX = (CALL建玉 × CALL_Gamma - PUT建玉 × PUT_Gamma) × S × 乗数
-        # 乗数は相対スケール（/100 で単位調整）
-        gex = (call_oi * gamma - put_oi * gamma) * S * S / 100
+        # ── GEX計算 ──
+        # GEX = (CALL建玉 - PUT建玉) × Gamma × S² / 100
+        # S² は先物価格 × 契約乗数の代用スケール
+        gex = (call_oi - put_oi) * gamma * S * S / 100
         gex_list.append({"StrikePrice": K_f, "GEX": round(gex, 2)})
 
     if not gex_list:
@@ -259,31 +279,41 @@ def calc_gex(df, S, T, r=0.005):
 
 def find_gamma_flip(gex_df, S):
     """
-    先物価格に最も近いGEXの正→負転換点を返す。
-    先物より上側と下側の両方を探し、より近い方を採用。
+    ガンマフリップ: GEX が負→正（または正→負）に切り替わる価格水準。
+
+    【定義】画像資料準拠:
+    - フリップより上: 安定ゾーン（GEX+、MMが逆張りヘッジ）
+    - フリップより下: 不安定ゾーン（GEX-、MMが順張りヘッジ）
+
+    S付近で GEX の符号が変わる転換点を返す。
+    複数候補があれば S に最も近い点を採用。
     """
     if gex_df.empty:
         return None
 
-    flip = None
-    best_dist = float("inf")
-
     gex_sorted = gex_df.sort_values("StrikePrice").reset_index(drop=True)
+    candidates = []
 
     for i in range(len(gex_sorted) - 1):
         g1 = gex_sorted.iloc[i]["GEX"]
         g2 = gex_sorted.iloc[i + 1]["GEX"]
         k1 = gex_sorted.iloc[i]["StrikePrice"]
         k2 = gex_sorted.iloc[i + 1]["StrikePrice"]
-        if g1 >= 0 > g2 or g1 < 0 <= g2:
-            # 転換点の中点を使用
-            mid = (k1 + k2) / 2
-            dist = abs(mid - S)
-            if dist < best_dist:
-                best_dist = dist
-                flip = round((k1 + k2) / 2)
+        # 符号転換（0を跨ぐ）
+        if (g1 >= 0 and g2 < 0) or (g1 < 0 and g2 >= 0):
+            # 線形補間で正確な転換点を推定
+            if abs(g2 - g1) > 0:
+                flip_k = k1 + (k2 - k1) * abs(g1) / (abs(g1) + abs(g2))
+            else:
+                flip_k = (k1 + k2) / 2
+            candidates.append((flip_k, abs(flip_k - S)))
 
-    return flip
+    if not candidates:
+        return None
+
+    # Sに最も近い転換点
+    best = min(candidates, key=lambda x: x[1])
+    return round(best[0])
 
 # ── ATM IV取得（有効値のみ）─────────────────────────
 
@@ -447,8 +477,8 @@ def analyze_month(df_m, S, month_str, today, oi_data=None):
     else:
         pcr = calc_pcr(df_m, S)
 
-    # GEX
-    gex_df = calc_gex(df_m, S, T)
+    # GEX（実OIがあれば使用、なければCallClose代用）
+    gex_df = calc_gex(df_m, S, T, oi_data=oi_data)
     total_gex = round(gex_df["GEX"].sum() / 1_000_000, 2) if not gex_df.empty else 0.0
     gex_pos   = total_gex >= 0
 
