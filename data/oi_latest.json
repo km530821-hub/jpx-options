@@ -1,6 +1,37 @@
 {
-  "generated_at": "2026-08-14",
-  "excel_date": "20260814",
-  "underlying_close": 68713.8,
-  "months": {}
+  "generated_at": "2026-08-17",
+  "excel_date": "20260817",
+  "underlying_close": 69220.25,
+  "months": {
+    "202604": {
+      "max_pain": 56091.0,
+      "pcr": null,
+      "oi_by_strike": {
+        "22215.0": {
+          "call_oi": 0.0,
+          "put_oi": 481570.0
+        },
+        "11357.0": {
+          "call_oi": 0.0,
+          "put_oi": 242041.0
+        },
+        "33572.0": {
+          "call_oi": 0.0,
+          "put_oi": 723611.0
+        },
+        "36132.0": {
+          "call_oi": 0.0,
+          "put_oi": 40186.0
+        },
+        "19959.0": {
+          "call_oi": 0.0,
+          "put_oi": 21562.0
+        },
+        "56091.0": {
+          "call_oi": 0.0,
+          "put_oi": 61748.0
+        }
+      }
+    }
+  }
 }
